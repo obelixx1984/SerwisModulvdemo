@@ -1,6 +1,8 @@
 <?php
 // templates/shared/my_failures.php
-// ZMIANA: obsługa other_symptom w kolumnie "Objaw" i modalu edycji
+// ZMIANY:
+// 3a. Nagłówek kolumny "Linia" → "Linia / Podzespół"
+// 3b. Modal edycji: dodano informację o podzespole
 
 use App\Helpers\Helpers;
 use App\Helpers\Auth;
@@ -62,7 +64,9 @@ require BASE_PATH . '/templates/shared/header.php';
     margin-bottom: 14px;
     font-size: 13px;
     color: #374151;
+    line-height: 1.7;
   }
+  .edit-modal-meta strong { color: #0a2463; }
   .other-cb-row {
     display: flex;
     align-items: center;
@@ -105,7 +109,7 @@ require BASE_PATH . '/templates/shared/header.php';
         <thead>
           <tr>
             <th>Numer</th>
-            <th>Linia</th>
+            <th>Linia / Podzespół</th><?php /* ZMIANA 3a */ ?>
             <th>Objaw</th>
             <th>Status</th>
             <th>Data zgłoszenia</th>
@@ -132,7 +136,6 @@ require BASE_PATH . '/templates/shared/header.php';
               <?php endif; ?>
             </td>
 
-            <?php /* ZMIANA: kolumna Objaw uwzględnia other_symptom */ ?>
             <td class="fs-sm">
               <?php if (!empty($f['other_symptom'])): ?>
                 <?php
@@ -155,6 +158,7 @@ require BASE_PATH . '/templates/shared/header.php';
             <td class="muted fs-sm"><?= date('d.m.Y H:i', strtotime($f['created_at'])) ?></td>
             <td style="text-align:center;white-space:nowrap;">
               <?php if ($statusIsInitial && !$isFinal): ?>
+                <?php /* ZMIANA 3b: nowy 4. argument — subsystem_name */ ?>
                 <button
                   type="button"
                   class="btn btn-p btn-sm"
@@ -163,6 +167,7 @@ require BASE_PATH . '/templates/shared/header.php';
                     <?= (int)$f['id'] ?>,
                     '<?= Helpers::e(addslashes($f['ticket_number'])) ?>',
                     '<?= Helpers::e(addslashes($f['line_name'])) ?>',
+                    '<?= Helpers::e(addslashes($f['subsystem_name'] ?? '')) ?>',
                     <?= (int)($f['symptom_id'] ?? 0) ?>,
                     <?= !empty($f['other_symptom']) ? 'true' : 'false' ?>,
                     <?= Helpers::e(json_encode($f['description'] ?? '')) ?>
@@ -194,15 +199,20 @@ require BASE_PATH . '/templates/shared/header.php';
     </div>
 
     <div class="edit-modal-body">
+
+      <?php /* ZMIANA 3b: meta z osobnymi wierszami — linia i opcjonalny podzespół */ ?>
       <div class="edit-modal-meta">
-        Zgłoszenie: <strong id="editModalTicket">—</strong> &nbsp;|&nbsp; Linia: <span id="editModalLine">—</span>
+        <div>Zgłoszenie: <strong id="editModalTicket">—</strong></div>
+        <div>Linia: <span id="editModalLine">—</span></div>
+        <div id="editModalSubsystemRow" style="display:none;">
+          Podzespół: <strong id="editModalSubsystem" style="color:#374151;">—</strong>
+        </div>
       </div>
 
       <form method="POST" action="<?= BASE_URL ?>/index.php?route=my_failure_edit" id="editSymptomForm">
         <input type="hidden" name="csrf_token" value="<?= Auth::csrfToken() ?>">
         <input type="hidden" name="failure_id" id="editFailureId" value="">
 
-        <?php /* ZMIANA: checkbox "Inne objawy" w modalu edycji */ ?>
         <label class="other-cb-row">
           <input
             type="checkbox"
@@ -217,7 +227,7 @@ require BASE_PATH . '/templates/shared/header.php';
 
         <div id="editSymptomGrp">
           <div class="fg">
-            <label class="flbl">Objaw awarii <span class="req" id="editSymptomReq">*</span></label>
+            <label class="flbl">Objaw awarii <span class="req">*</span></label>
             <select name="symptom_id" id="editSymptomSelect" class="fc" required>
               <option value="">— Wybierz objaw —</option>
               <?php foreach ($symptoms as $sym): ?>
@@ -247,10 +257,20 @@ require BASE_PATH . '/templates/shared/header.php';
 </div>
 
 <script>
-function openEditModal(failureId, ticket, lineName, currentSymptomId, isOtherSymptom, currentDesc) {
+// ZMIANA 3b: 4. argument to subsystemName (pozostałe przesunięte o 1)
+function openEditModal(failureId, ticket, lineName, subsystemName, currentSymptomId, isOtherSymptom, currentDesc) {
   document.getElementById('editFailureId').value         = failureId;
   document.getElementById('editModalTicket').textContent = ticket;
   document.getElementById('editModalLine').textContent   = lineName;
+
+  // Podzespół — pokaż tylko gdy istnieje
+  var subsRow = document.getElementById('editModalSubsystemRow');
+  if (subsystemName && subsystemName.trim() !== '') {
+    document.getElementById('editModalSubsystem').textContent = subsystemName;
+    subsRow.style.display = '';
+  } else {
+    subsRow.style.display = 'none';
+  }
 
   var cb = document.getElementById('editOtherSymptomCb');
   cb.checked = isOtherSymptom;

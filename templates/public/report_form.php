@@ -1,6 +1,9 @@
 <?php
 // templates/public/report_form.php
-// ZMIANA: dodano checkbox "Inne objawy" z logiką JS
+// ZMIANY:
+// 1. Checkbox "Inne objawy" przeniesiony POD select "Objaw awarii"
+// 2a. Przycisk "Zamknij" zamiast "+ Nowe" w karcie potwierdzenia
+// 2b. Karta potwierdzenia: pokazuje skrócony opis zamiast "Inne objawy"
 
 use App\Helpers\Helpers;
 use App\Helpers\Auth;
@@ -21,7 +24,6 @@ foreach ($lines as $l) {
     $subsystemsJs[$l['id']] = $subs;
 }
 
-// Czy po powrocie z POST checkbox był zaznaczony?
 $otherSymptomChecked = !empty($_POST['other_symptom']);
 ?>
 <div class="pub-layout">
@@ -95,25 +97,7 @@ $otherSymptomChecked = !empty($_POST['other_symptom']);
             </select>
           </div>
 
-          <?php /* ── ZMIANA: checkbox "Inne objawy" ── */ ?>
-          <div class="fg" style="margin-bottom:6px;">
-            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 10px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:7px;">
-              <input
-                type="checkbox"
-                name="other_symptom"
-                id="otherSymptomCb"
-                value="1"
-                <?= $otherSymptomChecked ? 'checked' : '' ?>
-                onchange="toggleOtherSymptom(this.checked)"
-                style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
-              <span style="font-size:13px;font-weight:600;color:#374151;">
-                Inne objawy
-                <span class="muted" style="font-weight:400;">&nbsp;— brak odpowiedniego objawu na liście</span>
-              </span>
-            </label>
-          </div>
-
-          <?php /* Wybór objawu — wyłączony gdy "Inne objawy" zaznaczone */ ?>
+          <?php /* ── ZMIANA 1: SELECT "Objaw awarii" jest PRZED checkboxem ── */ ?>
           <div class="fg" id="symptomGrp" style="<?= $otherSymptomChecked ? 'opacity:.4;pointer-events:none;' : '' ?>">
             <label class="flbl">
               Objaw awarii
@@ -137,7 +121,24 @@ $otherSymptomChecked = !empty($_POST['other_symptom']);
             </select>
           </div>
 
-          <?php /* Opis — opcjonalny normalnie, obowiązkowy gdy "Inne objawy" */ ?>
+          <?php /* ── ZMIANA 1: Checkbox "Inne objawy" jest PO selekcie ── */ ?>
+          <div class="fg" style="margin-top:-4px;margin-bottom:6px;">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 10px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:7px;">
+              <input
+                type="checkbox"
+                name="other_symptom"
+                id="otherSymptomCb"
+                value="1"
+                <?= $otherSymptomChecked ? 'checked' : '' ?>
+                onchange="toggleOtherSymptom(this.checked)"
+                style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
+              <span style="font-size:13px;font-weight:600;color:#374151;">
+                Inne objawy
+                <span class="muted" style="font-weight:400;">&nbsp;— brak odpowiedniego objawu na liście</span>
+              </span>
+            </label>
+          </div>
+
           <div class="fg">
             <label class="flbl">
               Dodatkowy opis
@@ -164,12 +165,19 @@ $otherSymptomChecked = !empty($_POST['other_symptom']);
 
   <div>
 
-    <?php /* ZMIANA 1: karta potwierdzenia nowo dodanego zgłoszenia */ ?>
+    <?php /* ZMIANA 2a + 2b: karta potwierdzenia — przycisk Zamknij + opis zamiast "Inne objawy" */ ?>
     <?php if (!empty($newFail)): ?>
-    <div class="card mb2" style="border:2px solid #16a34a;background:#f0fdf4;">
+    <div class="card mb2" id="newFailCard" style="border:2px solid #16a34a;background:#f0fdf4;">
       <div class="card-head" style="background:#dcfce7;border-bottom:1px solid #bbf7d0;border-radius:10px 10px 0 0;">
         <span class="card-title" style="color:#15803d;">✅ Zgłoszenie dodane pomyślnie</span>
-        <a href="<?= BASE_URL ?>/index.php?route=report&line_id=<?= (int)($currentLine['id'] ?? 0) ?>" class="btn btn-sm" style="background:#16a34a;color:#fff;border-color:#16a34a;">+ Nowe</a>
+        <?php /* ZMIANA 2a: przycisk Zamknij zamiast Nowe */ ?>
+        <button
+          type="button"
+          class="btn btn-sm"
+          onclick="document.getElementById('newFailCard').style.display='none'"
+          style="background:#16a34a;color:#fff;border-color:#16a34a;">
+          Zamknij
+        </button>
       </div>
       <div class="card-body">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px;">
@@ -179,8 +187,16 @@ $otherSymptomChecked = !empty($_POST['other_symptom']);
           <div>
             <div class="flbl">Objaw</div>
             <div>
+              <?php /* ZMIANA 2b: skrócony opis zamiast "Inne objawy" */ ?>
               <?php if (!empty($newFail['other_symptom'])): ?>
-                <em class="muted">Inne objawy</em>
+                <?php $descNew = trim($newFail['description'] ?? ''); ?>
+                <?php if ($descNew !== ''): ?>
+                  <span style="font-style:italic;" title="<?= Helpers::e($descNew) ?>">
+                    <?= Helpers::e(mb_strlen($descNew) > 44 ? mb_substr($descNew, 0, 42) . '…' : $descNew) ?>
+                  </span>
+                <?php else: ?>
+                  <em class="muted">Inne objawy</em>
+                <?php endif; ?>
               <?php else: ?>
                 <?= Helpers::e($newFail['symptom_name'] ?? '—') ?>
               <?php endif; ?>
@@ -234,12 +250,11 @@ $otherSymptomChecked = !empty($_POST['other_symptom']);
                     <?php if (!empty($currentLine['subsystems_str'])): ?>
                       <td class="fs-sm"><?= Helpers::e($f['subsystem_name'] ?? '—') ?></td>
                     <?php endif; ?>
-                    <?php /* ZMIANA: uwzględnij other_symptom */ ?>
                     <td class="fs-sm">
                       <?php if (!empty($f['other_symptom'])): ?>
                         <?php $d = trim($f['description'] ?? ''); ?>
                         <span style="font-style:italic;" title="<?= Helpers::e($d) ?>">
-                          <?= $d !== '' ? Helpers::e(mb_strlen($d) > 42 ? mb_substr($d, 0, 40) . '…' : $d) : '<span class="muted">Inne objawy</span>' ?>
+                          <?= $d !== '' ? Helpers::e(mb_strlen($d) > 42 ? mb_substr($d, 0, 40) . '…' : $d) : 'Inne objawy' ?>
                         </span>
                       <?php else: ?>
                         <?= Helpers::e($f['symptom_name'] ?? $f['dict_title'] ?? mb_substr($f['description'] ?? '', 0, 42)) ?>
@@ -287,7 +302,7 @@ $otherSymptomChecked = !empty($_POST['other_symptom']);
 <script>
   window.SUBSYSTEMS = <?= json_encode($subsystemsJs, JSON_HEX_TAG) ?>;
 
-  // ── ZMIANA: toggle "Inne objawy" ──────────────────────────
+  // ── Toggle "Inne objawy" ──────────────────────────────────
   function toggleOtherSymptom(checked) {
     var symptomGrp = document.getElementById('symptomGrp');
     var symptomSel = document.getElementById('pubSymptom');
@@ -299,35 +314,32 @@ $otherSymptomChecked = !empty($_POST['other_symptom']);
     var dupWarn    = document.getElementById('dupWarn');
 
     if (checked) {
-      // Inne objawy zaznaczone — wyłącz select objawu, wymagaj opisu
-      symptomGrp.style.opacity         = '.4';
-      symptomGrp.style.pointerEvents   = 'none';
-      symptomSel.disabled              = true;
+      symptomGrp.style.opacity       = '.4';
+      symptomGrp.style.pointerEvents = 'none';
+      symptomSel.disabled            = true;
       symptomSel.removeAttribute('required');
-      symptomSel.value                 = '';
-      symptomReq.style.display         = 'none';
-      descArea.required                = true;
-      descArea.placeholder             = 'Opisz dokładnie jaki objaw zaobserwowałeś...';
-      descReq.style.display            = 'inline';
-      descOpt.style.display            = 'none';
+      symptomSel.value               = '';
+      symptomReq.style.display       = 'none';
+      descArea.required              = true;
+      descArea.placeholder           = 'Opisz dokładnie jaki objaw zaobserwowałeś...';
+      descReq.style.display          = 'inline';
+      descOpt.style.display          = 'none';
       if (descHint) descHint.style.display = '';
-      // Ukryj ostrzeżenie o duplikacie
-      if (dupWarn) dupWarn.style.display = 'none';
+      if (dupWarn)  dupWarn.style.display  = 'none';
     } else {
-      // Normalny tryb — aktywuj select objawu, opis opcjonalny
-      symptomGrp.style.opacity         = '';
-      symptomGrp.style.pointerEvents   = '';
-      symptomSel.disabled              = false;
-      symptomSel.required              = true;
-      symptomReq.style.display         = 'inline';
-      descArea.required                = false;
-      descArea.placeholder             = 'Opisz dokładnie co zaobserwowałeś...';
-      descReq.style.display            = 'none';
-      descOpt.style.display            = 'inline';
+      symptomGrp.style.opacity       = '';
+      symptomGrp.style.pointerEvents = '';
+      symptomSel.disabled            = false;
+      symptomSel.required            = true;
+      symptomReq.style.display       = 'inline';
+      descArea.required              = false;
+      descArea.placeholder           = 'Opisz dokładnie co zaobserwowałeś...';
+      descReq.style.display          = 'none';
+      descOpt.style.display          = 'inline';
       if (descHint) descHint.style.display = 'none';
     }
   }
-  // ──────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
 
   // Zmiana linii → przeładuj stronę
   document.getElementById('pubLine').addEventListener('change', function() {
@@ -356,10 +368,10 @@ $otherSymptomChecked = !empty($_POST['other_symptom']);
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data && data.ticket) {
-            dt.textContent    = data.ticket;
-            dw.style.display  = 'block';
+            dt.textContent   = data.ticket;
+            dw.style.display = 'block';
           } else {
-            dw.style.display  = 'none';
+            dw.style.display = 'none';
           }
         }).catch(function() { dw.style.display = 'none'; });
     });
