@@ -862,18 +862,47 @@ class MaintenanceModel extends BaseModel
 
         return $this->fetchAll(
             "SELECT mr.*,
-                pl.name AS line_name,
-                ls.name AS subsystem_name,
-                u.name  AS performer_name, u.login AS performer_nick
-             FROM maintenance_reviews mr
-             JOIN production_lines pl ON pl.id = mr.production_line_id
-             LEFT JOIN line_subsystems ls ON ls.id = mr.subsystem_id
-             JOIN users u ON u.id = mr.performed_by
-             WHERE " . implode(' AND ', $where) . "
-             ORDER BY mr.review_date DESC
-             LIMIT $limit OFFSET $offset",
+            pl.name AS line_name,
+            ls.name AS subsystem_name,
+            u.name  AS performer_name, u.login AS performer_nick
+            FROM maintenance_reviews mr
+            JOIN production_lines pl ON pl.id = mr.production_line_id
+            LEFT JOIN line_subsystems ls ON ls.id = mr.subsystem_id
+            JOIN users u ON u.id = mr.performed_by
+            WHERE " . implode(' AND ', $where) . "
+            ORDER BY mr.review_date DESC, mr.id DESC
+            LIMIT $limit OFFSET $offset",
             $params
         );
+    }
+
+    /**
+     * Zlicza wszystkie raporty DUR spełniające filtry.
+     * Używane do paginacji na stronie /route=dur.
+     */
+    public function countAllReviews(array $filters = []): int
+    {
+        $where  = ['1=1'];
+        $params = [];
+        if (!empty($filters['line_id'])) {
+            $where[] = 'mr.production_line_id = ?';
+            $params[] = $filters['line_id'];
+        }
+        if (!empty($filters['status'])) {
+            $where[] = 'mr.status = ?';
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['type'])) {
+            $where[] = 'mr.review_type = ?';
+            $params[] = $filters['type'];
+        }
+        $st = $this->db->prepare(
+            "SELECT COUNT(*)
+             FROM maintenance_reviews mr
+             WHERE " . implode(' AND ', $where)
+        );
+        $st->execute($params);
+        return (int) $st->fetchColumn();
     }
 
     public function findScheduleByLineAndType(int $lineId, string $reviewType): ?array

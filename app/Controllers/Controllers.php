@@ -562,17 +562,24 @@ class DurController
     public function list(): void
     {
         // DUR dostepny publicznie (tylko odczyt)
-        $mm       = new MaintenanceModel();
-        $filters  = [
+        $mm      = new MaintenanceModel();
+        $filters = [
             'line_id' => (int)($_GET['line_id'] ?? 0) ?: null,
             'status'  => $_GET['status'] ?? null,
             'type'    => $_GET['type'] ?? null,
         ];
-        $reviews  = $mm->getAllReviews(array_filter($filters), 50, 0);
+        $page    = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = 18;  // ← stały limit 18 raportów na stronę
+
+        $activeFilters = array_filter($filters);
+        $total   = $mm->countAllReviews($activeFilters);          // ← nowa metoda
+        $pager   = Helpers::paginate($total, $page, $perPage);
+        $reviews = $mm->getAllReviews($activeFilters, $pager['per_page'], $pager['offset']);
+
         $durWarnDays = max(1, (int)((new \App\Models\SettingsModel())->get('dur_warning_days') ?? DUR_WARNING_DAYS));
         $upcoming    = $mm->getUpcomingSchedules($durWarnDays);
-        $lines    = (new ProductionLineModel())->getAll(true);
-        $templates = $mm->getTemplates();
+        $lines       = (new ProductionLineModel())->getAll(true);
+        $templates   = $mm->getTemplates();
 
         require BASE_PATH . '/templates/shared/dur_list.php';
     }
@@ -646,7 +653,7 @@ class DurController
         }
         // ─────────────────────────────────────────────────────────
 
-        Helpers::flash('success_dur', 'Raport DUR zapisany pomyślnie.');
+        Helpers::flash('success', 'Raport DUR zapisany pomyślnie.');
         Helpers::redirect('dur_detail', ['id' => $id]);
     }
 
