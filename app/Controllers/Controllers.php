@@ -163,16 +163,18 @@ class PublicController
         $lineId      = (int)($_POST['production_line_id'] ?? 0);
         $subsysId    = !empty($_POST['subsystem_id']) ? (int)$_POST['subsystem_id'] : null;
         // Zmiana 1: symptom_id zamiast category_id + dictionary_item_id
-        $symptomId   = !empty($_POST['symptom_id']) ? (int)$_POST['symptom_id'] : null;
-        $description = trim($_POST['description'] ?? '');
-        $currentUser  = Auth::user();
-        $reporterName = $currentUser['name'];
-        $reporterLogin = $currentUser['login'];
+        $otherSymptom   = !empty($_POST['other_symptom']) ? 1 : 0;
+        $symptomId      = (!$otherSymptom && !empty($_POST['symptom_id'])) ? (int)$_POST['symptom_id'] : null;
+        $description    = trim($_POST['description'] ?? '');
+        $currentUser    = Auth::user();
+        $reporterName   = $currentUser['name'];
+        $reporterLogin  = $currentUser['login'];
         $reporterUserId = (int)$currentUser['id'];
 
         $errors = [];
-        if (!$lineId)    $errors[] = 'Wybierz linię produkcyjną.';
-        if (!$symptomId) $errors[] = 'Wybierz objaw awarii.';
+        if (!$lineId) $errors[] = 'Wybierz linię produkcyjną.';
+        if (!$otherSymptom && !$symptomId) $errors[] = 'Wybierz objaw awarii.';
+        if ($otherSymptom && !$description) $errors[] = 'Wpisz opis — pole "Dodatkowy opis" jest wymagane przy "Inne objawy".';
 
         if ($errors) {
             Helpers::flash('error', implode(' ', $errors));
@@ -202,6 +204,7 @@ class PublicController
             'production_line_id' => $lineId,
             'subsystem_id'       => $subsysId,
             'symptom_id'         => $symptomId,
+            'other_symptom'      => $otherSymptom,         // ← NOWE
             'status_id'          => $initStatus['id'],
             'reporter_acronym'   => $reporterLogin,
             'reporter_user_id'   => $reporterUserId,
@@ -1375,12 +1378,24 @@ class UserController
             Helpers::redirect('my_failures');
         }
 
-        $user      = Auth::user();
-        $id        = (int)($_POST['failure_id'] ?? 0);
-        $symptomId = !empty($_POST['symptom_id']) ? (int)$_POST['symptom_id'] : null;
+        $user         = Auth::user();
+        $id           = (int)($_POST['failure_id'] ?? 0);
+        $otherSymptom = !empty($_POST['other_symptom']) ? 1 : 0;
+        $symptomId    = (!$otherSymptom && !empty($_POST['symptom_id'])) ? (int)$_POST['symptom_id'] : null;
+        $description  = trim($_POST['description'] ?? '');
 
-        if (!$id || !$symptomId) {
+        if (!$id) {
             Helpers::flash('error', 'Nieprawidłowe dane formularza.');
+            Helpers::redirect('my_failures');
+            return;
+        }
+        if (!$otherSymptom && !$symptomId) {
+            Helpers::flash('error', 'Wybierz objaw awarii.');
+            Helpers::redirect('my_failures');
+            return;
+        }
+        if ($otherSymptom && !$description) {
+            Helpers::flash('error', 'Wpisz opis przy "Inne objawy".');
             Helpers::redirect('my_failures');
             return;
         }
@@ -1418,7 +1433,7 @@ class UserController
         }
 
         // Zapisz zmianę objawu
-        $fm->updateSymptom($id, $symptomId);
+        $fm->updateSymptom($id, $symptomId, $otherSymptom, $description ?: null);
         $fm->addHistory(
             $id,
             (int)$user['id'],
@@ -1426,7 +1441,9 @@ class UserController
             null,
             null,
             $user['name'],
-            'Zaktualizowano objaw awarii przez zgłaszającego'
+            $otherSymptom
+                ? 'Zaktualizowano objaw (Inne objawy) przez zgłaszającego'
+                : 'Zaktualizowano objaw awarii przez zgłaszającego'
         );
 
         Helpers::flash('success', 'Objaw awarii zaktualizowany pomyślnie.');

@@ -1,8 +1,7 @@
 <?php
-// ============================================================
-// templates/shared/my_failures.php — Moje zgłoszenia
-// POPRAWKA błąd 1: edycja otwiera modal zamiast strony /report
-// ============================================================
+// templates/shared/my_failures.php
+// ZMIANA: obsługa other_symptom w kolumnie "Objaw" i modalu edycji
+
 use App\Helpers\Helpers;
 use App\Helpers\Auth;
 
@@ -11,7 +10,6 @@ require BASE_PATH . '/templates/shared/header.php';
 ?>
 
 <style>
-  /* Modal edycji objawu */
   .edit-modal-overlay {
     display: none;
     position: fixed;
@@ -26,14 +24,14 @@ require BASE_PATH . '/templates/shared/header.php';
     background: #fff;
     border-radius: 12px;
     width: 100%;
-    max-width: 440px;
+    max-width: 460px;
     box-shadow: 0 20px 60px rgba(0,0,0,.20);
     overflow: hidden;
     animation: editModalIn .15s ease;
   }
   @keyframes editModalIn {
     from { opacity:0; transform:scale(.96); }
-    to   { opacity:1; transform:scale(1);   }
+    to   { opacity:1; transform:scale(1); }
   }
   .edit-modal-head {
     background: #0a2463;
@@ -53,7 +51,6 @@ require BASE_PATH . '/templates/shared/header.php';
     cursor: pointer;
     line-height: 1;
     padding: 0;
-    transition: color .1s;
   }
   .edit-modal-close:hover { color: #fff; }
   .edit-modal-body { padding: 20px; }
@@ -66,13 +63,26 @@ require BASE_PATH . '/templates/shared/header.php';
     font-size: 13px;
     color: #374151;
   }
-  .edit-modal-meta strong { color: #0a2463; font-family: monospace; }
+  .other-cb-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 7px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+  }
 </style>
 
 <div class="sh mb2">
   <div>
     <div class="sh-title">📋 Moje zgłoszenia</div>
-    <div class="muted fs-sm" style="margin-top:2px;">Awarie zgłoszone przez Ciebie — możesz edytować objaw tych ze statusem startowym.</div>
+    <div class="muted fs-sm" style="margin-top:2px;">Awarie zgłoszone przez Ciebie — możesz edytować te ze statusem startowym.</div>
   </div>
   <a href="<?= BASE_URL ?>/index.php?route=report" class="btn btn-p btn-sm">+ Nowe zgłoszenie</a>
 </div>
@@ -104,7 +114,6 @@ require BASE_PATH . '/templates/shared/header.php';
         </thead>
         <tbody>
           <?php foreach ($myFailures as $f):
-            // Ustal czy status jest startowy na podstawie tablicy statusów
             $statusIsInitial = false;
             foreach ($statuses as $s) {
               if ($s['id'] == $f['status_id'] && !empty($s['is_initial'])) {
@@ -115,33 +124,37 @@ require BASE_PATH . '/templates/shared/header.php';
             $isFinal = !empty($f['status_is_final']);
           ?>
           <tr>
-            <td>
-              <span class="mono fw6" style="color:#0a2463;">
-                <?= Helpers::e($f['ticket_number']) ?>
-              </span>
-            </td>
+            <td><span class="mono fw6" style="color:#0a2463;"><?= Helpers::e($f['ticket_number']) ?></span></td>
             <td>
               <?= Helpers::e($f['line_name']) ?>
               <?php if ($f['subsystem_name']): ?>
                 <div class="muted fs-sm"><?= Helpers::e($f['subsystem_name']) ?></div>
               <?php endif; ?>
             </td>
+
+            <?php /* ZMIANA: kolumna Objaw uwzględnia other_symptom */ ?>
             <td class="fs-sm">
-              <?= $f['symptom_name'] ? Helpers::e($f['symptom_name']) : '<span class="muted">—</span>' ?>
+              <?php if (!empty($f['other_symptom'])): ?>
+                <?php
+                  $d = trim($f['description'] ?? '');
+                  $display = $d !== ''
+                    ? (mb_strlen($d) > 44 ? mb_substr($d, 0, 42) . '…' : $d)
+                    : 'Inne objawy';
+                ?>
+                <span style="font-style:italic;color:#6b7280;" title="<?= Helpers::e($d) ?>">
+                  <?= Helpers::e($display) ?>
+                </span>
+              <?php elseif ($f['symptom_name']): ?>
+                <?= Helpers::e($f['symptom_name']) ?>
+              <?php else: ?>
+                <span class="muted">—</span>
+              <?php endif; ?>
             </td>
-            <td>
-              <?php
-                $sc = $f['status_color'] ?? '#6b7280';
-                $sl = $f['status_label'] ?? '—';
-                echo Helpers::statusBadge($sl, $sc);
-              ?>
-            </td>
-            <td class="muted fs-sm">
-              <?= date('d.m.Y H:i', strtotime($f['created_at'])) ?>
-            </td>
+
+            <td><?php echo Helpers::statusBadge($f['status_label'] ?? '—', $f['status_color'] ?? '#6b7280'); ?></td>
+            <td class="muted fs-sm"><?= date('d.m.Y H:i', strtotime($f['created_at'])) ?></td>
             <td style="text-align:center;white-space:nowrap;">
               <?php if ($statusIsInitial && !$isFinal): ?>
-                <!-- POPRAWKA błąd 1: otwiera modal zamiast przejścia do /report -->
                 <button
                   type="button"
                   class="btn btn-p btn-sm"
@@ -150,12 +163,14 @@ require BASE_PATH . '/templates/shared/header.php';
                     <?= (int)$f['id'] ?>,
                     '<?= Helpers::e(addslashes($f['ticket_number'])) ?>',
                     '<?= Helpers::e(addslashes($f['line_name'])) ?>',
-                    <?= (int)($f['symptom_id'] ?? 0) ?>
+                    <?= (int)($f['symptom_id'] ?? 0) ?>,
+                    <?= !empty($f['other_symptom']) ? 'true' : 'false' ?>,
+                    <?= Helpers::e(json_encode($f['description'] ?? '')) ?>
                   )">
                   ✏ Edytuj
                 </button>
               <?php else: ?>
-                <span class="muted fs-sm" title="Zgłoszenie jest w trakcie realizacji lub zamknięte">—</span>
+                <span class="muted fs-sm">—</span>
               <?php endif; ?>
             </td>
           </tr>
@@ -179,7 +194,7 @@ require BASE_PATH . '/templates/shared/header.php';
     </div>
 
     <div class="edit-modal-body">
-      <div class="edit-modal-meta" id="editModalMeta">
+      <div class="edit-modal-meta">
         Zgłoszenie: <strong id="editModalTicket">—</strong> &nbsp;|&nbsp; Linia: <span id="editModalLine">—</span>
       </div>
 
@@ -187,17 +202,39 @@ require BASE_PATH . '/templates/shared/header.php';
         <input type="hidden" name="csrf_token" value="<?= Auth::csrfToken() ?>">
         <input type="hidden" name="failure_id" id="editFailureId" value="">
 
-        <div class="fg">
-          <label class="flbl">Objaw awarii <span class="req">*</span></label>
-          <select name="symptom_id" id="editSymptomSelect" class="fc" required>
-            <option value="">— Wybierz objaw —</option>
-            <?php foreach ($symptoms as $sym): ?>
-              <option value="<?= (int)$sym['id'] ?>">
-                <?= Helpers::e($sym['name']) ?>
-              </option>
-            <?php endforeach; ?>
-          </select>
-          <span class="fhint">Wybierz objaw który najlepiej opisuje awarię.</span>
+        <?php /* ZMIANA: checkbox "Inne objawy" w modalu edycji */ ?>
+        <label class="other-cb-row">
+          <input
+            type="checkbox"
+            name="other_symptom"
+            id="editOtherSymptomCb"
+            value="1"
+            style="width:16px;height:16px;cursor:pointer;flex-shrink:0;"
+            onchange="toggleEditOtherSymptom(this.checked)">
+          Inne objawy
+          <span class="muted" style="font-weight:400;">&nbsp;— brak odpowiedniego na liście</span>
+        </label>
+
+        <div id="editSymptomGrp">
+          <div class="fg">
+            <label class="flbl">Objaw awarii <span class="req" id="editSymptomReq">*</span></label>
+            <select name="symptom_id" id="editSymptomSelect" class="fc" required>
+              <option value="">— Wybierz objaw —</option>
+              <?php foreach ($symptoms as $sym): ?>
+                <option value="<?= (int)$sym['id'] ?>"><?= Helpers::e($sym['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <span class="fhint">Wybierz objaw który najlepiej opisuje awarię.</span>
+          </div>
+        </div>
+
+        <div id="editDescGrp" style="display:none;">
+          <div class="fg">
+            <label class="flbl">Opis objawu <span class="req">*</span></label>
+            <textarea name="description" id="editDescArea" class="fc" rows="3"
+              placeholder="Opisz dokładnie jaki objaw zaobserwowałeś..."></textarea>
+            <span class="fhint">Opis pojawi się na listach zamiast nazwy objawu.</span>
+          </div>
         </div>
 
         <div style="display:flex;gap:8px;margin-top:4px;">
@@ -210,31 +247,55 @@ require BASE_PATH . '/templates/shared/header.php';
 </div>
 
 <script>
-function openEditModal(failureId, ticket, lineName, currentSymptomId) {
-  document.getElementById('editFailureId').value       = failureId;
+function openEditModal(failureId, ticket, lineName, currentSymptomId, isOtherSymptom, currentDesc) {
+  document.getElementById('editFailureId').value         = failureId;
   document.getElementById('editModalTicket').textContent = ticket;
   document.getElementById('editModalLine').textContent   = lineName;
 
-  // Ustaw aktualny objaw w select
-  var sel = document.getElementById('editSymptomSelect');
-  sel.value = currentSymptomId || '';
+  var cb = document.getElementById('editOtherSymptomCb');
+  cb.checked = isOtherSymptom;
+  toggleEditOtherSymptom(isOtherSymptom);
+
+  if (isOtherSymptom) {
+    document.getElementById('editDescArea').value = currentDesc || '';
+  } else {
+    document.getElementById('editSymptomSelect').value = currentSymptomId || '';
+  }
 
   document.getElementById('editSymptomModal').classList.add('open');
   document.body.style.overflow = 'hidden';
+}
+
+function toggleEditOtherSymptom(checked) {
+  var symptomGrp = document.getElementById('editSymptomGrp');
+  var symptomSel = document.getElementById('editSymptomSelect');
+  var descGrp    = document.getElementById('editDescGrp');
+  var descArea   = document.getElementById('editDescArea');
+
+  if (checked) {
+    symptomGrp.style.display = 'none';
+    symptomSel.disabled      = true;
+    symptomSel.removeAttribute('required');
+    symptomSel.value         = '';
+    descGrp.style.display    = '';
+    descArea.required        = true;
+  } else {
+    symptomGrp.style.display = '';
+    symptomSel.disabled      = false;
+    symptomSel.required      = true;
+    descGrp.style.display    = 'none';
+    descArea.required        = false;
+    descArea.value           = '';
+  }
 }
 
 function closeEditModal() {
   document.getElementById('editSymptomModal').classList.remove('open');
   document.body.style.overflow = '';
 }
-
 function closeEditModalOutside(e) {
-  if (e.target === document.getElementById('editSymptomModal')) {
-    closeEditModal();
-  }
+  if (e.target === document.getElementById('editSymptomModal')) closeEditModal();
 }
-
-// Zamknij modalem klawiszem Escape
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeEditModal();
 });

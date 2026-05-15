@@ -580,20 +580,21 @@ class FailureModel extends BaseModel
     {
         return $this->execute(
             "INSERT INTO failures
-             (ticket_number, production_line_id, subsystem_id, symptom_id, category_id, status_id,
-              dictionary_item_id, reporter_acronym, reporter_name, reporter_user_id, description)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (ticket_number, production_line_id, subsystem_id, symptom_id, other_symptom, category_id, status_id,
+            dictionary_item_id, reporter_acronym, reporter_name, reporter_user_id, description)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 $d['ticket_number'],
                 $d['production_line_id'],
                 $d['subsystem_id'] ?? null,
                 $d['symptom_id'] ?? null,
+                $d['other_symptom'] ?? 0,      // ← NOWE
                 $d['category_id'] ?? null,
                 $d['status_id'],
                 $d['dictionary_item_id'] ?? null,
                 $d['reporter_acronym'] ?? null,
                 $d['reporter_name'] ?? null,
-                $d['reporter_user_id'] ?? null,   // ← NOWE
+                $d['reporter_user_id'] ?? null,
                 $d['description'] ?? null,
             ]
         );
@@ -635,11 +636,13 @@ class FailureModel extends BaseModel
      * Używane przez użytkownika z modala edycji w "Moje zgłoszenia".
      * Nowa metoda — Poprawka błąd 1.
      */
-    public function updateSymptom(int $id, ?int $symptomId): void
+    public function updateSymptom(int $id, ?int $symptomId, int $otherSymptom = 0, ?string $description = null): void
     {
         $this->execute(
-            "UPDATE failures SET symptom_id = ?, updated_at = NOW() WHERE id = ?",
-            [$symptomId, $id]
+            "UPDATE failures
+             SET symptom_id = ?, other_symptom = ?, description = ?, updated_at = NOW()
+             WHERE id = ?",
+            [$symptomId, $otherSymptom, $description, $id]
         );
     }
 

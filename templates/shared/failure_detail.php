@@ -31,7 +31,13 @@ require BASE_PATH . '/templates/shared/header.php';
           <?php /* Zmiana 1: wyświetl objaw zgłaszającego */ ?>
           <div>
             <div class="flbl">Objaw zgłoszony</div>
-            <div class="fw6"><?= Helpers::e($failure['symptom_name'] ?? '—') ?></div>
+            <div class="fw6">
+              <?php if (!empty($failure['other_symptom'])): ?>
+                <em style="color:#6b7280;">Inne objawy</em>
+              <?php else: ?>
+                <?= Helpers::e($failure['symptom_name'] ?? '—') ?>
+              <?php endif; ?>
+            </div>
           </div>
           <div>
             <div class="flbl">Zgłaszający</div>
@@ -67,7 +73,9 @@ require BASE_PATH . '/templates/shared/header.php';
           </div>
           <?php if ($failure['description']): ?>
             <div style="grid-column:1/-1;">
-              <div class="flbl">Opis dodatkowy</div>
+              <div class="flbl">
+                <?= !empty($failure['other_symptom']) ? 'Opis objawu (Inne objawy)' : 'Opis dodatkowy' ?>
+              </div>
               <div><?= nl2br(Helpers::e($failure['description'])) ?></div>
             </div>
           <?php endif; ?>

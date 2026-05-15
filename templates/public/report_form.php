@@ -1,4 +1,6 @@
 <?php
+// templates/public/report_form.php
+// ZMIANA: dodano checkbox "Inne objawy" z logiką JS
 
 use App\Helpers\Helpers;
 use App\Helpers\Auth;
@@ -8,16 +10,19 @@ require BASE_PATH . '/templates/shared/header.php';
 
 $subsystemsJs = [];
 foreach ($lines as $l) {
-  $subs = [];
-  if (!empty($l['subsystems_str'])) {
-    $ids   = explode(',', $l['subsystem_ids'] ?? '');
-    $names = explode('|||', $l['subsystems_str']);
-    foreach ($names as $i => $n) {
-      $subs[] = ['id' => trim($ids[$i] ?? ''), 'name' => trim($n)];
+    $subs = [];
+    if (!empty($l['subsystems_str'])) {
+        $ids   = explode(',', $l['subsystem_ids'] ?? '');
+        $names = explode('|||', $l['subsystems_str']);
+        foreach ($names as $i => $n) {
+            $subs[] = ['id' => trim($ids[$i] ?? ''), 'name' => trim($n)];
+        }
     }
-  }
-  $subsystemsJs[$l['id']] = $subs;
+    $subsystemsJs[$l['id']] = $subs;
 }
+
+// Czy po powrocie z POST checkbox był zaznaczony?
+$otherSymptomChecked = !empty($_POST['other_symptom']);
 ?>
 <div class="pub-layout">
   <div>
@@ -90,10 +95,35 @@ foreach ($lines as $l) {
             </select>
           </div>
 
-          <?php /* Zmiana 1: wybór objawu zamiast kategorii + słownika */ ?>
-          <div class="fg">
-            <label class="flbl">Objaw awarii <span class="req">*</span></label>
-            <select name="symptom_id" id="pubSymptom" class="fc" required>
+          <?php /* ── ZMIANA: checkbox "Inne objawy" ── */ ?>
+          <div class="fg" style="margin-bottom:6px;">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 10px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:7px;">
+              <input
+                type="checkbox"
+                name="other_symptom"
+                id="otherSymptomCb"
+                value="1"
+                <?= $otherSymptomChecked ? 'checked' : '' ?>
+                onchange="toggleOtherSymptom(this.checked)"
+                style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
+              <span style="font-size:13px;font-weight:600;color:#374151;">
+                Inne objawy
+                <span class="muted" style="font-weight:400;">&nbsp;— brak odpowiedniego objawu na liście</span>
+              </span>
+            </label>
+          </div>
+
+          <?php /* Wybór objawu — wyłączony gdy "Inne objawy" zaznaczone */ ?>
+          <div class="fg" id="symptomGrp" style="<?= $otherSymptomChecked ? 'opacity:.4;pointer-events:none;' : '' ?>">
+            <label class="flbl">
+              Objaw awarii
+              <span class="req" id="symptomReq" style="<?= $otherSymptomChecked ? 'display:none' : '' ?>">*</span>
+            </label>
+            <select
+              name="symptom_id"
+              id="pubSymptom"
+              class="fc"
+              <?= $otherSymptomChecked ? 'disabled' : 'required' ?>>
               <option value="">— Wybierz objaw —</option>
               <?php
               $selectedSymptom = $_POST['symptom_id'] ?? $_GET['symptom_id'] ?? '';
@@ -107,10 +137,23 @@ foreach ($lines as $l) {
             </select>
           </div>
 
+          <?php /* Opis — opcjonalny normalnie, obowiązkowy gdy "Inne objawy" */ ?>
           <div class="fg">
-            <label class="flbl">Dodatkowy opis (opcjonalnie)</label>
-            <textarea name="description" class="fc" rows="3"
-              placeholder="Opisz dokładnie co zaobserwowałeś..."><?= Helpers::e($_POST['description'] ?? '') ?></textarea>
+            <label class="flbl">
+              Dodatkowy opis
+              <span class="req" id="descReq" style="<?= $otherSymptomChecked ? '' : 'display:none' ?>">*</span>
+              <span id="descOpt" class="muted fs-sm" style="<?= $otherSymptomChecked ? 'display:none' : '' ?>">&nbsp;(opcjonalnie)</span>
+            </label>
+            <textarea
+              name="description"
+              id="descArea"
+              class="fc"
+              rows="3"
+              <?= $otherSymptomChecked ? 'required' : '' ?>
+              placeholder="<?= $otherSymptomChecked ? 'Opisz dokładnie jaki objaw zaobserwowałeś...' : 'Opisz dokładnie co zaobserwowałeś...' ?>"><?= Helpers::e($_POST['description'] ?? '') ?></textarea>
+            <span class="fhint" id="descHint" style="<?= $otherSymptomChecked ? '' : 'display:none' ?>">
+              ⚠ Opis jest wymagany gdy wybrano "Inne objawy" — pojawi się w miejscu objawu na listach.
+            </span>
           </div>
 
           <button type="submit" class="pub-btn">🚨 Wyślij zgłoszenie awarii</button>
@@ -126,47 +169,32 @@ foreach ($lines as $l) {
     <div class="card mb2" style="border:2px solid #16a34a;background:#f0fdf4;">
       <div class="card-head" style="background:#dcfce7;border-bottom:1px solid #bbf7d0;border-radius:10px 10px 0 0;">
         <span class="card-title" style="color:#15803d;">✅ Zgłoszenie dodane pomyślnie</span>
-        <a href="<?= BASE_URL ?>/index.php?route=report&line_id=<?= (int)($currentLine['id'] ?? 0) ?>"
-           class="btn btn-sm" style="border-color:#16a34a;color:#16a34a;">✕ Zamknij</a>
+        <a href="<?= BASE_URL ?>/index.php?route=report&line_id=<?= (int)($currentLine['id'] ?? 0) ?>" class="btn btn-sm" style="background:#16a34a;color:#fff;border-color:#16a34a;">+ Nowe</a>
       </div>
-      <div class="card-body" style="padding:14px 16px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <span class="mono fw6" style="color:#0a2463;font-size:18px;">
-            <?= Helpers::e($newFail['ticket_number']) ?>
-          </span>
-          <?= Helpers::statusBadge($newFail['status_label'], $newFail['status_color']) ?>
-        </div>
-        <div class="fs-sm" style="color:#374151;line-height:1.9;">
-          <div><strong>Linia:</strong> <?= Helpers::e($newFail['line_name'] ?? '—') ?></div>
-          <?php if (!empty($newFail['symptom_name'])): ?>
-          <div><strong>Objaw:</strong> <?= Helpers::e($newFail['symptom_name']) ?></div>
-          <?php endif; ?>
-          <?php if (!empty($newFail['subsystem_name'])): ?>
-          <div><strong>Podzespół:</strong> <?= Helpers::e($newFail['subsystem_name']) ?></div>
-          <?php endif; ?>
-          <?php if (!empty($newFail['description'])): ?>
-          <div><strong>Opis:</strong> <?= Helpers::e(mb_substr($newFail['description'], 0, 80)) ?><?= mb_strlen($newFail['description']) > 80 ? '…' : '' ?></div>
-          <?php endif; ?>
-          <div><strong>Zgłaszający:</strong> <?= Helpers::e($newFail['reporter_name']) ?></div>
-          <div><strong>Data:</strong> <?= Helpers::formatDateOnly($newFail['created_at']) ?></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px;">
+          <div><div class="flbl">Numer</div><div class="mono fw6"><?= Helpers::e($newFail['ticket_number']) ?></div></div>
+          <div><div class="flbl">Status</div><div><?= Helpers::statusBadge($newFail['status_label'] ?? '—', $newFail['status_color'] ?? '#6b7280') ?></div></div>
+          <div><div class="flbl">Linia</div><div><?= Helpers::e($newFail['line_name'] ?? '—') ?></div></div>
+          <div>
+            <div class="flbl">Objaw</div>
+            <div>
+              <?php if (!empty($newFail['other_symptom'])): ?>
+                <em class="muted">Inne objawy</em>
+              <?php else: ?>
+                <?= Helpers::e($newFail['symptom_name'] ?? '—') ?>
+              <?php endif; ?>
+            </div>
+          </div>
         </div>
       </div>
     </div>
     <?php endif; ?>
 
-    <?php if (!$currentLine): ?>
-      <div class="card" style="border:2px dashed #e5e7eb;">
-        <div class="card-body" style="text-align:center;padding:40px 20px;">
-          <div style="font-size:3rem;margin-bottom:10px;">🏭</div>
-          <div class="fw6 mb1">Wybierz linię produkcyjną</div>
-          <div class="muted fs-sm">Po wybraniu linii zobaczysz historię awarii z ostatnich 30 dni i ostatnie przeglądy DUR — dzięki temu unikniesz duplikowania zgłoszeń przy 3-zmianowej pracy.</div>
-        </div>
-      </div>
-    <?php else: ?>
-
-      <div class="g3 mb2" style="gap:8px;">
+    <?php if ($currentLine): ?>
+      <div class="stats mb2" style="grid-template-columns:repeat(3,1fr);">
         <div class="stat-card">
-          <div class="stat-val sv-r" style="font-size:22px;"><?= (int)($lineStats['total'] ?? 0) ?></div>
+          <div class="stat-val sv-b" style="font-size:22px;"><?= (int)($lineStats['total'] ?? 0) ?></div>
           <div class="stat-lbl">Awarii / 30 dni</div>
         </div>
         <div class="stat-card">
@@ -206,8 +234,17 @@ foreach ($lines as $l) {
                     <?php if (!empty($currentLine['subsystems_str'])): ?>
                       <td class="fs-sm"><?= Helpers::e($f['subsystem_name'] ?? '—') ?></td>
                     <?php endif; ?>
-                    <?php /* Zmiana 1: symptom_name jako fallback */ ?>
-                    <td class="fs-sm"><?= Helpers::e($f['symptom_name'] ?? $f['dict_title'] ?? mb_substr($f['description'] ?? '', 0, 40)) ?></td>
+                    <?php /* ZMIANA: uwzględnij other_symptom */ ?>
+                    <td class="fs-sm">
+                      <?php if (!empty($f['other_symptom'])): ?>
+                        <?php $d = trim($f['description'] ?? ''); ?>
+                        <span style="font-style:italic;" title="<?= Helpers::e($d) ?>">
+                          <?= $d !== '' ? Helpers::e(mb_strlen($d) > 42 ? mb_substr($d, 0, 40) . '…' : $d) : '<span class="muted">Inne objawy</span>' ?>
+                        </span>
+                      <?php else: ?>
+                        <?= Helpers::e($f['symptom_name'] ?? $f['dict_title'] ?? mb_substr($f['description'] ?? '', 0, 42)) ?>
+                      <?php endif; ?>
+                    </td>
                     <td><?= Helpers::statusBadge($f['status_label'], $f['status_color']) ?></td>
                   </tr>
                 <?php endforeach; ?>
@@ -250,18 +287,60 @@ foreach ($lines as $l) {
 <script>
   window.SUBSYSTEMS = <?= json_encode($subsystemsJs, JSON_HEX_TAG) ?>;
 
-  // Zmiana linii → przeładuj stronę z zachowaniem wybranego objawu
+  // ── ZMIANA: toggle "Inne objawy" ──────────────────────────
+  function toggleOtherSymptom(checked) {
+    var symptomGrp = document.getElementById('symptomGrp');
+    var symptomSel = document.getElementById('pubSymptom');
+    var symptomReq = document.getElementById('symptomReq');
+    var descArea   = document.getElementById('descArea');
+    var descReq    = document.getElementById('descReq');
+    var descOpt    = document.getElementById('descOpt');
+    var descHint   = document.getElementById('descHint');
+    var dupWarn    = document.getElementById('dupWarn');
+
+    if (checked) {
+      // Inne objawy zaznaczone — wyłącz select objawu, wymagaj opisu
+      symptomGrp.style.opacity         = '.4';
+      symptomGrp.style.pointerEvents   = 'none';
+      symptomSel.disabled              = true;
+      symptomSel.removeAttribute('required');
+      symptomSel.value                 = '';
+      symptomReq.style.display         = 'none';
+      descArea.required                = true;
+      descArea.placeholder             = 'Opisz dokładnie jaki objaw zaobserwowałeś...';
+      descReq.style.display            = 'inline';
+      descOpt.style.display            = 'none';
+      if (descHint) descHint.style.display = '';
+      // Ukryj ostrzeżenie o duplikacie
+      if (dupWarn) dupWarn.style.display = 'none';
+    } else {
+      // Normalny tryb — aktywuj select objawu, opis opcjonalny
+      symptomGrp.style.opacity         = '';
+      symptomGrp.style.pointerEvents   = '';
+      symptomSel.disabled              = false;
+      symptomSel.required              = true;
+      symptomReq.style.display         = 'inline';
+      descArea.required                = false;
+      descArea.placeholder             = 'Opisz dokładnie co zaobserwowałeś...';
+      descReq.style.display            = 'none';
+      descOpt.style.display            = 'inline';
+      if (descHint) descHint.style.display = 'none';
+    }
+  }
+  // ──────────────────────────────────────────────────────────
+
+  // Zmiana linii → przeładuj stronę
   document.getElementById('pubLine').addEventListener('change', function() {
     var lineId     = this.value;
     var symptomSel = document.getElementById('pubSymptom');
-    var symptomVal = symptomSel ? symptomSel.value : '';
+    var symptomVal = (symptomSel && !symptomSel.disabled) ? symptomSel.value : '';
     var url = '<?= BASE_URL ?>/index.php?route=report';
     if (lineId)     url += '&line_id='    + encodeURIComponent(lineId);
     if (symptomVal) url += '&symptom_id=' + encodeURIComponent(symptomVal);
     window.location.href = url;
   });
 
-  // Zmiana 1+5: sprawdź duplikaty po wyborze objawu (symptom_id zamiast dict_id)
+  // Sprawdź duplikaty po wyborze objawu
   (function() {
     var symptomSel = document.getElementById('pubSymptom');
     var lineSel    = document.getElementById('pubLine');
@@ -272,22 +351,17 @@ foreach ($lines as $l) {
       var dw = document.getElementById('dupWarn');
       var dt = document.getElementById('dupTicket');
       if (!dw || !dt) return;
-      if (!symptomId || !lineId) {
-        dw.style.display = 'none';
-        return;
-      }
+      if (!symptomId || !lineId) { dw.style.display = 'none'; return; }
       fetch('<?= BASE_URL ?>/index.php?route=check_duplicate&line_id=' + lineId + '&symptom_id=' + symptomId)
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data && data.ticket) {
-            dt.textContent = data.ticket;
-            dw.style.display = 'block';
+            dt.textContent    = data.ticket;
+            dw.style.display  = 'block';
           } else {
-            dw.style.display = 'none';
+            dw.style.display  = 'none';
           }
-        }).catch(function() {
-          dw.style.display = 'none';
-        });
+        }).catch(function() { dw.style.display = 'none'; });
     });
   })();
 </script>
