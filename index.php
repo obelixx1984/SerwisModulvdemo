@@ -63,7 +63,9 @@ $routes = [
     'dur'                 => ['App\\Controllers\\DurController',     'list'],
     'dur_add'             => ['App\\Controllers\\DurController',     'addForm'],
     'dur_add_post'        => ['App\\Controllers\\DurController',     'addPost'],
-       // ── Nowe trasy — użytkownik ──────────────────────────────
+    'dur_edit'            => ['App\\Controllers\\DurController',     'editForm'],
+    'dur_edit_post'       => ['App\\Controllers\\DurController',     'editPost'],
+    // ── Nowe trasy — użytkownik ──────────────────────────────
     'change_password'     => ['App\\Controllers\\UserController',   'changePassword'],
     'my_failures'         => ['App\\Controllers\\UserController',   'myFailures'],
     'my_failure_edit'     => ['App\\Controllers\\UserController',   'myFailureEdit'],   // Poprawka błąd 1
@@ -80,7 +82,7 @@ $routes = [
     'admin_dict_save'     => ['App\\Controllers\\AdminController',   'dictItemSave'],
     'admin_symptoms'      => ['App\\Controllers\\AdminController',   'symptoms'],       // Zmiana 1
     'admin_symptom_save'  => ['App\\Controllers\\AdminController',   'symptomSave'],    // Zmiana 1
-    'admin_symptom_delete'=> ['App\\Controllers\\AdminController',   'symptomDelete'],  // Zmiana 1
+    'admin_symptom_delete' => ['App\\Controllers\\AdminController',   'symptomDelete'],  // Zmiana 1
     'admin_dur_tmpl'      => ['App\\Controllers\\AdminController',   'durTemplates'],
     'admin_dur_sched'     => ['App\\Controllers\\AdminController',   'durSchedules'],
     'admin_settings'      => ['App\\Controllers\\AdminController',   'settings'],
@@ -92,12 +94,12 @@ $routes = [
     'admin_tmpl_save'     => ['App\\Controllers\\AdminController',   'tmplSave'],
     'admin_sched_save'    => ['App\\Controllers\\AdminController',   'schedSave'],
     'check_duplicate'     => ['App\\Controllers\\AjaxController',    'checkDuplicate'],
-    'admin_user_delete'   => ['App\\Controllers\\AdminController',   'deleteUser'], 
+    'admin_user_delete'   => ['App\\Controllers\\AdminController',   'deleteUser'],
     'admin_line_delete'   => ['App\\Controllers\\AdminController',   'deleteLine'],
     'admin_status_delete' => ['App\\Controllers\\AdminController',   'deleteStatus'],
     'admin_tmpl_delete'   => ['App\\Controllers\\AdminController',   'deleteTmpl'],
     'admin_sched_delete'  => ['App\\Controllers\\AdminController',   'deleteSched'],
-    'admin_dur_types_save'=> ['App\\Controllers\\AdminController',   'durTypesSave'],
+    'admin_dur_types_save' => ['App\\Controllers\\AdminController',   'durTypesSave'],
 ];
 
 if (isset($routes[$route])) {

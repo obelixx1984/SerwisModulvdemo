@@ -982,6 +982,36 @@ class MaintenanceModel extends BaseModel
         );
     }
 
+    /**
+     * Aktualizuje istniejący raport DUR.
+     * Używane przez DurController::editPost().
+     */
+    public function update(int $id, array $d): void
+    {
+        $this->execute(
+            "UPDATE maintenance_reviews
+             SET review_date      = ?,
+                 duration_minutes = ?,
+                 activities       = ?,
+                 parts_used       = ?,
+                 notes            = ?,
+                 status           = ?,
+                 next_review_date = ?,
+                 updated_at       = NOW()
+             WHERE id = ?",
+            [
+                $d['review_date'],
+                $d['duration_minutes'] ?? null,
+                $d['activities'],
+                $d['parts_used'] ?? null,
+                $d['notes'] ?? null,
+                $d['status'] ?? 'completed',
+                $d['next_review_date'] ?? null,
+                $id,
+            ]
+        );
+    }
+
     public function getUpcomingSchedules(int $days = 14): array
     {
         return $this->fetchAll(

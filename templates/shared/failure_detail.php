@@ -16,7 +16,11 @@ $canEdit = $canEdit ?? \App\Helpers\Auth::isMechanic();
 ?>
 
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-  <a href="<?= BASE_URL ?>/index.php?route=failures" class="btn btn-sm">← Lista zgłoszeń</a>
+  <?php if ($canEdit): ?>
+    <a href="<?= BASE_URL ?>/index.php?route=failures" class="btn btn-sm">← Lista zgłoszeń</a>
+  <?php else: ?>
+    <a href="<?= BASE_URL ?>/index.php?route=my_failures" class="btn btn-sm">← Moje zgłoszenia</a>
+  <?php endif; ?>
   <h1 style="font-size:16px;font-weight:700;margin:0;">
     <?= Helpers::e($failure['ticket_number']) ?>
   </h1>
@@ -28,7 +32,7 @@ $canEdit = $canEdit ?? \App\Helpers\Auth::isMechanic();
 
 <div class="g2">
 
-  <!-- ── Lewa kolumna: informacje o zgłoszeniu ── -->
+  <!-- ── Lewa kolumna: informacje + komentarze ── -->
   <div>
 
     <div class="card mb2">
@@ -121,7 +125,48 @@ $canEdit = $canEdit ?? \App\Helpers\Auth::isMechanic();
       </div>
     </div>
 
-    <!-- Historia zdarzeń -->
+    <!-- Komentarze serwisowe -->
+    <div class="card mb2">
+      <div class="card-head"><span class="card-title">Komentarze serwisowe</span></div>
+      <div class="card-body">
+        <?php if ($comments): ?>
+          <?php foreach ($comments as $c): ?>
+            <div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <strong class="fs-sm"><?= Helpers::e($c['author']) ?></strong>
+                <span class="muted fs-sm"><?= Helpers::formatDate($c['created_at']) ?></span>
+              </div>
+              <p style="font-size:13px;line-height:1.5;"><?= nl2br(Helpers::e($c['comment'])) ?></p>
+            </div>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <p class="muted fs-sm mb1">Brak komentarzy.</p>
+        <?php endif; ?>
+
+        <?php if ($canEdit): ?>
+          <div class="sep"></div>
+          <form method="POST" action="<?= BASE_URL ?>/index.php?route=add_comment">
+            <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
+            <input type="hidden" name="failure_id" value="<?= $failure['id'] ?>">
+            <div class="fg mb1">
+              <label class="flbl">Dodaj komentarz</label>
+              <textarea name="comment" class="fc" rows="3" placeholder="Opisz wykonane czynności..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-p btn-sm">Dodaj komentarz</button>
+          </form>
+        <?php else: ?>
+          <div class="sep"></div>
+          <p class="muted fs-sm">Komentarze może dodawać tylko serwisant.</p>
+        <?php endif; ?>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Prawa kolumna: historia (zawsze) + akcje (canEdit) ── -->
+  <div>
+
+    <!-- Historia zdarzeń — ZAWSZE po prawej stronie -->
     <div class="card mb2">
       <div class="card-head"><span class="card-title">Historia zdarzeń</span></div>
       <div class="card-body">
@@ -145,48 +190,6 @@ $canEdit = $canEdit ?? \App\Helpers\Auth::isMechanic();
         <?php endif; ?>
       </div>
     </div>
-
-    <!-- Komentarze serwisowe -->
-    <div class="card mb2">
-      <div class="card-head"><span class="card-title">Komentarze serwisowe</span></div>
-      <div class="card-body">
-        <?php if ($comments): ?>
-          <?php foreach ($comments as $c): ?>
-            <div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">
-              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-                <strong class="fs-sm"><?= Helpers::e($c['author']) ?></strong>
-                <span class="muted fs-sm"><?= Helpers::formatDate($c['created_at']) ?></span>
-              </div>
-              <p style="font-size:13px;line-height:1.5;"><?= nl2br(Helpers::e($c['comment'])) ?></p>
-            </div>
-          <?php endforeach; ?>
-        <?php else: ?>
-          <p class="muted fs-sm mb1">Brak komentarzy.</p>
-        <?php endif; ?>
-
-        <?php /* ZMIANA: formularz komentarza tylko dla canEdit */ ?>
-        <?php if ($canEdit): ?>
-          <div class="sep"></div>
-          <form method="POST" action="<?= BASE_URL ?>/index.php?route=add_comment">
-            <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
-            <input type="hidden" name="failure_id" value="<?= $failure['id'] ?>">
-            <div class="fg mb1">
-              <label class="flbl">Dodaj komentarz</label>
-              <textarea name="comment" class="fc" rows="3" placeholder="Opisz wykonane czynności..." required></textarea>
-            </div>
-            <button type="submit" class="btn btn-p btn-sm">Dodaj komentarz</button>
-          </form>
-        <?php else: ?>
-          <div class="sep"></div>
-          <p class="muted fs-sm">Komentarze może dodawać tylko serwisant.</p>
-        <?php endif; ?>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- ── Prawa kolumna: akcje (tylko dla canEdit) ── -->
-  <div>
 
     <?php /* ZMIANA: sekcja kategorii i usterki — tylko gdy canEdit */ ?>
     <?php if ($canEdit): ?>
@@ -223,9 +226,10 @@ $canEdit = $canEdit ?? \App\Helpers\Auth::isMechanic();
               </select>
             </div>
 
-            <div class="fg" id="dictGrp">
+            <div class="fg" id="dictGrp" style="<?= $failure['other_failure'] ? 'opacity:.4;pointer-events:none;' : '' ?>">
               <label class="flbl">Usterka ze słownika</label>
-              <select name="dictionary_item_id" id="mechDict" class="fc">
+              <select name="dictionary_item_id" id="mechDict" class="fc"
+                <?= $failure['other_failure'] ? 'disabled' : '' ?>>
                 <option value="">— Wybierz usterkę —</option>
                 <?php foreach ($dictionary as $d): ?>
                   <option value="<?= $d['id'] ?>"
@@ -304,14 +308,13 @@ $canEdit = $canEdit ?? \App\Helpers\Auth::isMechanic();
     </div>
     <?php endif; /* koniec canEdit — status */ ?>
 
-    <?php /* Dla obserwatora (zgłaszającego bez uprawnień) — informacja */ ?>
     <?php if (!$canEdit): ?>
     <div class="card mb2">
       <div class="card-head"><span class="card-title">Status zgłoszenia</span></div>
       <div class="card-body">
         <p class="fs-sm" style="margin:0;">Aktualne: <?= Helpers::statusBadge($sl, $sc) ?></p>
         <p class="muted fs-sm" style="margin-top:8px;">
-          Zmiana statusu i kategorii należy do serwisanta. Możesz śledzić postęp swojego zgłoszenia na tej stronie.
+          Zmiana statusu i kategorii nie jest możliwa — nie masz uprawnień.
         </p>
       </div>
     </div>
@@ -342,11 +345,24 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function toggleOtherFailure(checked) {
-  var grp  = document.getElementById('mechanicNoteGrp');
-  var note = document.getElementById('mechanicNote');
-  if (!grp || !note) return;
-  grp.style.display = checked ? 'block' : 'none';
-  note.required     = checked;
+  var dictGrp = document.getElementById('dictGrp');
+  var dictSel = document.getElementById('mechDict');
+  var grp     = document.getElementById('mechanicNoteGrp');
+  var note    = document.getElementById('mechanicNote');
+
+  if (checked) {
+    // Inna usterka — zablokuj słownik, wymagaj notatki
+    if (dictGrp) { dictGrp.style.opacity = '.4'; dictGrp.style.pointerEvents = 'none'; }
+    if (dictSel) { dictSel.disabled = true; dictSel.value = ''; }
+    if (grp)     grp.style.display = 'block';
+    if (note)    note.required = true;
+  } else {
+    // Normalna usterka — odblokuj słownik, ukryj notatkę
+    if (dictGrp) { dictGrp.style.opacity = ''; dictGrp.style.pointerEvents = ''; }
+    if (dictSel) { dictSel.disabled = false; }
+    if (grp)     grp.style.display = 'none';
+    if (note)    { note.required = false; }
+  }
 }
 </script>
 

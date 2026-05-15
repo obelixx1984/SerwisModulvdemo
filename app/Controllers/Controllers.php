@@ -87,12 +87,12 @@ class AuthController
             Helpers::redirect('failures');
             return;
         }
-        if (!empty($perms['dur'])) {
-            Helpers::redirect('dur');
+        if (!empty($perms['report'])) {   // ← PRZENIESIONE przed dur
+            Helpers::redirect('report');
             return;
         }
-        if (!empty($perms['report'])) {
-            Helpers::redirect('report');
+        if (!empty($perms['dur'])) {      // ← PRZENIESIONE za report
+            Helpers::redirect('dur');
             return;
         }
         Helpers::redirect('line_history'); // zawsze dostępna
@@ -676,6 +676,111 @@ class DurController
             return;
         }
         require BASE_PATH . '/templates/shared/dur_detail.php';
+    }
+
+    /**
+     * Formularz edycji raportu DUR.
+     * Dostępny tylko dla autora raportu z uprawnieniem 'dur'.
+     */
+    public function editForm(): void
+    {
+        Auth::requireLogin();
+        if (!Auth::hasPermission('dur')) {
+            Helpers::flash('error', 'Brak uprawnień do przeglądów DUR.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        $id     = (int)($_GET['id'] ?? 0);
+        $review = (new MaintenanceModel())->getById($id);
+
+        if (!$review) {
+            require BASE_PATH . '/templates/shared/404.php';
+            return;
+        }
+
+        $user = Auth::user();
+        if ((int)$review['performed_by'] !== (int)$user['id']) {
+            Helpers::flash('error', 'Możesz edytować tylko własne raporty DUR.');
+            Helpers::redirect('dur_detail', ['id' => $id]);
+            return;
+        }
+
+        require BASE_PATH . '/templates/shared/dur_edit.php';
+    }
+
+    /**
+     * Obsługa POST z formularza edycji raportu DUR.
+     */
+    public function editPost(): void
+    {
+        Auth::requireLogin();
+        if (!Auth::hasPermission('dur')) {
+            Helpers::flash('error', 'Brak uprawnień.');
+            Helpers::redirect('dur');
+            return;
+        }
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        $id         = (int)($_POST['review_id'] ?? 0);
+        $activities = trim($_POST['activities'] ?? '');
+        $reviewDate = trim($_POST['review_date'] ?? '');
+        $duration   = !empty($_POST['duration_minutes']) ? (int)$_POST['duration_minutes'] : null;
+        $status     = in_array($_POST['status'] ?? '', ['completed', 'partial', 'interrupted'])
+            ? $_POST['status'] : 'completed';
+        $nextDate   = trim($_POST['next_review_date'] ?? '');
+        $parts      = trim($_POST['parts_used'] ?? '');
+        $notes      = trim($_POST['notes'] ?? '');
+
+        if (!$id || !$activities || !$reviewDate) {
+            Helpers::flash('error', 'Wypełnij wymagane pola: data, czynności.');
+            Helpers::redirect('dur_edit', ['id' => $id]);
+            return;
+        }
+
+        $mm     = new MaintenanceModel();
+        $review = $mm->getById($id);
+
+        if (!$review) {
+            Helpers::flash('error', 'Raport nie istnieje.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        $user = Auth::user();
+        if ((int)$review['performed_by'] !== (int)$user['id']) {
+            Helpers::flash('error', 'Możesz edytować tylko własne raporty DUR.');
+            Helpers::redirect('dur_detail', ['id' => $id]);
+            return;
+        }
+
+        $mm->update($id, [
+            'review_date'      => $reviewDate,
+            'duration_minutes' => $duration,
+            'activities'       => $activities,
+            'parts_used'       => $parts ?: null,
+            'notes'            => $notes ?: null,
+            'status'           => $status,
+            'next_review_date' => $nextDate ?: null,
+        ]);
+
+        // Zaktualizuj harmonogram jeśli podano datę następnego przeglądu
+        if ($nextDate) {
+            $schedule = $mm->findScheduleByLineAndType(
+                (int)$review['production_line_id'],
+                $review['review_type']
+            );
+            if ($schedule) {
+                $mm->updateScheduleNextDate($schedule['id'], $nextDate);
+            }
+        }
+
+        Helpers::flash('success', 'Raport DUR zaktualizowany pomyślnie.');
+        Helpers::redirect('dur_detail', ['id' => $id]);
     }
 }
 
