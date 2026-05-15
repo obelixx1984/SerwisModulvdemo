@@ -66,7 +66,8 @@ class AuthController
             $st->execute(['role_perms_' . $role]);
             $val = $st->fetchColumn();
             if ($val) $perms = json_decode($val, true) ?? [];
-        } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {
+        }
 
         // Domyślne uprawnienia gdy brak w bazie
         if (empty($perms)) {
@@ -78,10 +79,22 @@ class AuthController
         }
 
         // Przekieruj do pierwszej dostępnej sekcji (priorytet jak niżej)
-        if (!empty($perms['dashboard'])) { Helpers::redirect('dashboard');    return; }
-        if (!empty($perms['failures']))  { Helpers::redirect('failures');     return; }
-        if (!empty($perms['dur']))       { Helpers::redirect('dur');          return; }
-        if (!empty($perms['report']))    { Helpers::redirect('report');       return; }
+        if (!empty($perms['dashboard'])) {
+            Helpers::redirect('dashboard');
+            return;
+        }
+        if (!empty($perms['failures'])) {
+            Helpers::redirect('failures');
+            return;
+        }
+        if (!empty($perms['dur'])) {
+            Helpers::redirect('dur');
+            return;
+        }
+        if (!empty($perms['report'])) {
+            Helpers::redirect('report');
+            return;
+        }
         Helpers::redirect('line_history'); // zawsze dostępna
     }
 
@@ -258,7 +271,8 @@ class FailureController
         $mm        = new MaintenanceModel();
         $stats     = $fm->getDashboardStats();
         $recent    = $fm->getList([], 6, 0);
-        $upcoming  = $mm->getUpcomingSchedules(DUR_WARNING_DAYS);
+        $durWarnDays = max(1, (int)((new \App\Models\SettingsModel())->get('dur_warning_days') ?? DUR_WARNING_DAYS));
+        $upcoming    = $mm->getUpcomingSchedules($durWarnDays);
         $statuses  = (new StatusModel())->getAll(true);
 
         // Średni czas naprawy dla wszystkich linii (zachowany do ewentualnego użycia)
@@ -298,7 +312,12 @@ class FailureController
 
     public function list(): void
     {
-        Auth::requireMechanic();
+        Auth::requireLogin();
+        if (!Auth::isMechanic() && !Auth::hasPermission('failures')) {
+            Helpers::flash('error', 'Brak uprawnień do listy zgłoszeń.');
+            Helpers::redirect('dashboard');
+            return;
+        }
         $catRaw   = $_GET['category_id'] ?? '';
         $filters  = [
             'status_id'   => (int)($_GET['status_id'] ?? 0) ?: null,
@@ -322,7 +341,12 @@ class FailureController
     // Zmiana 2: załaduj kategorie i słownik dla sekcji mechanika
     public function detail(): void
     {
-        Auth::requireMechanic();
+        Auth::requireLogin();
+        if (!Auth::isMechanic() && !Auth::hasPermission('failures')) {
+            Helpers::flash('error', 'Brak uprawnień do szczegółów zgłoszenia.');
+            Helpers::redirect('dashboard');
+            return;
+        }
         $id      = (int)($_GET['id'] ?? 0);
         $fm      = new FailureModel();
         $failure = $fm->getById($id);
@@ -527,7 +551,8 @@ class DurController
             'type'    => $_GET['type'] ?? null,
         ];
         $reviews  = $mm->getAllReviews(array_filter($filters), 50, 0);
-        $upcoming = $mm->getUpcomingSchedules(DUR_WARNING_DAYS);
+        $durWarnDays = max(1, (int)((new \App\Models\SettingsModel())->get('dur_warning_days') ?? DUR_WARNING_DAYS));
+        $upcoming    = $mm->getUpcomingSchedules($durWarnDays);
         $lines    = (new ProductionLineModel())->getAll(true);
         $templates = $mm->getTemplates();
 
@@ -1329,18 +1354,92 @@ class UserController
         $user       = Auth::user();
         $fm         = new FailureModel();
         $statuses   = (new StatusModel())->getAll(true);
+        $symptoms   = (new SymptomModel())->getActive();   // ← NOWE: lista objawów dla modala
 
-        // Pobierz zgłoszenia tego użytkownika
         $myFailures = $fm->getByReporterUserId((int)$user['id'], $user['name']);
 
         $pageTitle  = 'Moje zgłoszenia';
         require BASE_PATH . '/templates/shared/my_failures.php';
     }
 
+    /**
+     * Obsługuje POST z modala edycji objawu w "Moje zgłoszenia".
+     * Weryfikuje własność zgłoszenia i status startowy.
+     * Nowa metoda — Poprawka błąd 1.
+     */
+    public function myFailureEdit(): void
+    {
+        Auth::requireLogin();
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('my_failures');
+        }
+
+        $user      = Auth::user();
+        $id        = (int)($_POST['failure_id'] ?? 0);
+        $symptomId = !empty($_POST['symptom_id']) ? (int)$_POST['symptom_id'] : null;
+
+        if (!$id || !$symptomId) {
+            Helpers::flash('error', 'Nieprawidłowe dane formularza.');
+            Helpers::redirect('my_failures');
+            return;
+        }
+
+        $fm      = new FailureModel();
+        $failure = $fm->getById($id);
+
+        if (!$failure) {
+            Helpers::flash('error', 'Zgłoszenie nie istnieje.');
+            Helpers::redirect('my_failures');
+            return;
+        }
+
+        // Sprawdź czy zgłoszenie należy do tego użytkownika
+        if ((int)($failure['reporter_user_id'] ?? 0) !== (int)$user['id']) {
+            Helpers::flash('error', 'Brak uprawnień do edycji tego zgłoszenia.');
+            Helpers::redirect('my_failures');
+            return;
+        }
+
+        // Sprawdź czy status jest nadal startowy
+        $statuses  = (new StatusModel())->getAll(true);
+        $isInitial = false;
+        foreach ($statuses as $s) {
+            if ($s['id'] == $failure['status_id'] && !empty($s['is_initial'])) {
+                $isInitial = true;
+                break;
+            }
+        }
+
+        if (!$isInitial) {
+            Helpers::flash('error', 'Zgłoszenie nie ma już statusu startowego — edycja niemożliwa.');
+            Helpers::redirect('my_failures');
+            return;
+        }
+
+        // Zapisz zmianę objawu
+        $fm->updateSymptom($id, $symptomId);
+        $fm->addHistory(
+            $id,
+            (int)$user['id'],
+            'edited',
+            null,
+            null,
+            $user['name'],
+            'Zaktualizowano objaw awarii przez zgłaszającego'
+        );
+
+        Helpers::flash('success', 'Objaw awarii zaktualizowany pomyślnie.');
+        Helpers::redirect('my_failures');
+    }
+
     private function redirectBack(): void
     {
         $ref = $_SERVER['HTTP_REFERER'] ?? '';
-        if ($ref) { header('Location: ' . $ref); exit; }
+        if ($ref) {
+            header('Location: ' . $ref);
+            exit;
+        }
         Helpers::redirect('dashboard');
     }
 }

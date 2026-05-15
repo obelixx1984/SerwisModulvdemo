@@ -66,6 +66,7 @@ $routes = [
        // ── Nowe trasy — użytkownik ──────────────────────────────
     'change_password'     => ['App\\Controllers\\UserController',   'changePassword'],
     'my_failures'         => ['App\\Controllers\\UserController',   'myFailures'],
+    'my_failure_edit'     => ['App\\Controllers\\UserController',   'myFailureEdit'],   // Poprawka błąd 1
     // ─────────────────────────────────────────────────────────
     'dur_detail'          => ['App\\Controllers\\DurController',     'detail'],
     'admin_users'         => ['App\\Controllers\\AdminController',   'users'],

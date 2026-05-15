@@ -630,6 +630,19 @@ class FailureModel extends BaseModel
         );
     }
 
+    /**
+     * Aktualizuje objaw awarii (symptom_id) zgłoszenia.
+     * Używane przez użytkownika z modala edycji w "Moje zgłoszenia".
+     * Nowa metoda — Poprawka błąd 1.
+     */
+    public function updateSymptom(int $id, ?int $symptomId): void
+    {
+        $this->execute(
+            "UPDATE failures SET symptom_id = ?, updated_at = NOW() WHERE id = ?",
+            [$symptomId, $id]
+        );
+    }
+
     // Zmiana 2: mechanik ustawia kategorie i usterkę
     public function setCategory(int $id, array $d): void
     {

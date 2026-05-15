@@ -55,10 +55,10 @@ class Auth
     public static function user(): array
     {
         return [
-            'id'       => $_SESSION['user_id']       ?? null,
-            'name'     => $_SESSION['user_name']     ?? '',
-            'login'    => $_SESSION['user_login']    ?? '',
-            'role'     => $_SESSION['user_role']     ?? '',
+            'id'    => $_SESSION['user_id']    ?? null,
+            'name'  => $_SESSION['user_name']  ?? '',
+            'login' => $_SESSION['user_login'] ?? '',
+            'role'  => $_SESSION['user_role']  ?? '',
         ];
     }
 
@@ -90,7 +90,6 @@ class Auth
     public static function requireAdmin(): void
     {
         self::requireLogin();
-        // Sprawdź uprawnienia admin z bazy (obsługuje role niestandardowe)
         if (self::hasAdminPermission()) return;
         Helpers::flash('error', 'Brak uprawnień do tej sekcji.');
         Helpers::redirect('dashboard');
@@ -99,23 +98,48 @@ class Auth
     /** Zwraca true jeśli użytkownik ma uprawnienie 'admin' (z bazy lub wbudowane) */
     public static function hasAdminPermission(): bool
     {
+        return self::hasPermission('admin');
+    }
+
+    // ── NOWA METODA (Poprawka błędu 2) ────────────────────────────
+    /**
+     * Sprawdza czy zalogowany użytkownik ma dane uprawnienie.
+     * Odczytuje uprawnienia z tabeli settings (role_perms_{rola}).
+     * Admin zawsze ma wszystkie uprawnienia.
+     *
+     * @param string $perm  Klucz uprawnienia: 'report','dashboard','failures',
+     *                      'dur','statuses','admin'
+     */
+    public static function hasPermission(string $perm): bool
+    {
         $role = $_SESSION['user_role'] ?? '';
-        // Rola 'admin' zawsze ma dostęp
+        if (!$role) return false;
+
+        // Admin zawsze ma pełny dostęp
         if ($role === 'admin') return true;
-        // Inne role — sprawdź w settings
+
+        // Odczytaj uprawnienia roli z bazy danych
         try {
             $pdo = \App\Helpers\Database::get();
-            $st  = $pdo->prepare("SELECT svalue FROM settings WHERE skey=? LIMIT 1");
+            $st  = $pdo->prepare("SELECT svalue FROM settings WHERE skey = ? LIMIT 1");
             $st->execute(['role_perms_' . $role]);
             $val = $st->fetchColumn();
             if ($val) {
                 $perms = json_decode($val, true) ?? [];
-                return !empty($perms['admin']);
+                return !empty($perms[$perm]);
             }
         } catch (\Throwable $e) {
+            // Baza niedostępna — użyj fallbacku
         }
-        return false;
+
+        // Fallback: domyślne uprawnienia dla wbudowanych ról
+        $defaults = [
+            'mechanic' => ['dashboard' => 1, 'failures' => 1, 'dur' => 1, 'statuses' => 1],
+            'operator' => ['report'    => 1, 'dur'      => 1],
+        ];
+        return !empty($defaults[$role][$perm]);
     }
+    // ─────────────────────────────────────────────────────────────
 
     // CSRF
     public static function csrfToken(): string
