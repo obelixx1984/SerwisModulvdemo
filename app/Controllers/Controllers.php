@@ -6,8 +6,16 @@ namespace App\Controllers;
 
 use App\Helpers\Auth;
 use App\Helpers\Helpers;
-use App\Models\{UserModel, EmployeeModel, ProductionLineModel, CategoryModel,
-               DictionaryModel, StatusModel, FailureModel, MaintenanceModel, SettingsModel};
+use App\Models\{
+    UserModel,
+    ProductionLineModel,
+    CategoryModel,
+    DictionaryModel,
+    StatusModel,
+    FailureModel,
+    MaintenanceModel,
+    SettingsModel
+};
 
 // ────────────────────────────────────────────────────────────
 class AuthController
@@ -28,13 +36,13 @@ class AuthController
         $nickname = strtolower(trim($_POST['nickname'] ?? ''));
         $pass     = $_POST['password'] ?? '';
         if (!$nickname || !$pass) {
-            Helpers::flash('error', 'Podaj nickname i hasło.');
+            Helpers::flash('error', 'Podaj login i hasło.');
             Helpers::redirect('login');
         }
         $model = new UserModel();
         $user  = $model->findByNickname($nickname);
         if (!$user || !password_verify($pass, $user['password_hash'])) {
-            Helpers::flash('error', 'Nieprawidłowy nickname lub hasło.');
+            Helpers::flash('error', 'Nieprawidłowy login lub hasło.');
             Helpers::redirect('login');
         }
         Auth::login($user);
@@ -55,10 +63,11 @@ class PublicController
     /** Formularz zgłoszenia awarii */
     public function reportForm(): void
     {
+        Auth::requireLogin();
+
         $lines      = (new ProductionLineModel())->getAll(true);
         $categories = (new CategoryModel())->getAll(true);
         $dictionary = (new DictionaryModel())->getActive();
-        $employees  = (new EmployeeModel())->getAll(true);
 
         $selectedLineId = (int)($_GET['line_id'] ?? 0);
         $lineHistory    = [];
@@ -69,7 +78,10 @@ class PublicController
 
         if ($selectedLineId) {
             foreach ($lines as $l) {
-                if ((int)$l['id'] === $selectedLineId) { $currentLine = $l; break; }
+                if ((int)$l['id'] === $selectedLineId) {
+                    $currentLine = $l;
+                    break;
+                }
             }
             $fm          = new FailureModel();
             $mm          = new MaintenanceModel();
@@ -87,6 +99,8 @@ class PublicController
 
     public function reportPost(): void
     {
+        Auth::requireLogin();
+
         if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
             Helpers::flash('error', 'Błąd bezpieczeństwa. Spróbuj ponownie.');
             Helpers::redirect('report');
@@ -97,15 +111,17 @@ class PublicController
         $categoryId  = (int)($_POST['category_id'] ?? 0);
         $dictItemId  = !empty($_POST['dictionary_item_id']) ? (int)$_POST['dictionary_item_id'] : null;
         $description = trim($_POST['description'] ?? '');
-        $reporterAk  = trim($_POST['reporter_acronym'] ?? '');
+        $currentUser  = Auth::user();
+        $reporterName = $currentUser['name'];
+        $reporterLogin = $currentUser['login'];
 
         $errors = [];
         if (!$lineId)     $errors[] = 'Wybierz linię produkcyjną.';
         if (!$categoryId) $errors[] = 'Wybierz rodzaj awarii.';
-        if (!$reporterAk) $errors[] = 'Wybierz osobę zgłaszającą.';
         if (!$dictItemId && !$description) {
             $errors[] = 'Wybierz usterkę ze słownika lub wpisz opis własny.';
         }
+
         if ($errors) {
             Helpers::flash('error', implode(' ', $errors));
             Helpers::redirect('report');
@@ -126,8 +142,9 @@ class PublicController
         }
 
         // Pobierz pełną nazwę pracownika
-        $emp          = (new EmployeeModel())->findByAcronym($reporterAk);
-        $reporterName = $emp ? $emp['name'] : $reporterAk;
+        $currentUser   = Auth::user();
+        $reporterName  = $currentUser['name'];
+        $reporterLogin = $currentUser['login'];
 
         // POPRAWKA 1: Generuj numer w formacie 0001/PREFIX/ROK
         $ticket = Helpers::generateTicketNumber($lineId, $line['prefix']);
@@ -140,18 +157,26 @@ class PublicController
             'category_id'        => $categoryId,
             'status_id'          => $initStatus['id'],
             'dictionary_item_id' => $dictItemId,
-            'reporter_acronym'   => $reporterAk,
+            'reporter_acronym'   => $reporterLogin,
             'reporter_name'      => $reporterName,
             'description'        => $description ?: null,
         ]);
 
-        $fm->addHistory($failId, null, 'created', null, $initStatus['id'],
-            $reporterAk . ' – ' . $reporterName,
-            'Zgłoszenie awarii utworzone');
+        $fm->addHistory(
+            $failId,
+            $currentUser['id'],
+            'created',
+            null,
+            $initStatus['id'],
+            $reporterLogin . ' – ' . $reporterName,
+            'Zgłoszenie awarii utworzone'
+        );
 
         // POPRAWKA 2: Informacja o DUR przekazana przez flash (pokaże komunikat w szablonie)
-        Helpers::flash('success_dur',
-            'Zgłoszenie wysłane pomyślnie. Numer: <strong>' . Helpers::e($ticket) . '</strong>');
+        Helpers::flash(
+            'success_dur',
+            'Zgłoszenie wysłane pomyślnie. Numer: <strong>' . Helpers::e($ticket) . '</strong>'
+        );
         Helpers::redirect('report');
     }
 
@@ -166,13 +191,16 @@ class PublicController
         $fm          = new FailureModel();
         $mm          = new MaintenanceModel();
         $failures    = [];
-        $stats       = ['total'=>0,'open_count'=>0,'closed_count'=>0,'avg_repair_str'=>'—'];
+        $stats       = ['total' => 0, 'open_count' => 0, 'closed_count' => 0, 'avg_repair_str' => '—'];
         $durList     = [];
         $currentLine = null;
 
         if ($lineId > 0) {
             foreach ($lines as $l) {
-                if ((int)$l['id'] === $lineId) { $currentLine = $l; break; }
+                if ((int)$l['id'] === $lineId) {
+                    $currentLine = $l;
+                    break;
+                }
             }
             $failures = $fm->getLineHistory($lineId, $days);
             $rawStats = $fm->getLineStats($lineId, $days);
@@ -242,7 +270,10 @@ class FailureController
         $id      = (int)($_GET['id'] ?? 0);
         $fm      = new FailureModel();
         $failure = $fm->getById($id);
-        if (!$failure) { require BASE_PATH . '/templates/shared/404.php'; return; }
+        if (!$failure) {
+            require BASE_PATH . '/templates/shared/404.php';
+            return;
+        }
 
         $history  = $fm->getHistory($id);
         $comments = $fm->getComments($id);
@@ -264,7 +295,9 @@ class FailureController
 
         $fm      = new FailureModel();
         $failure = $fm->getById($id);
-        if (!$failure) { Helpers::redirect('failures'); }
+        if (!$failure) {
+            Helpers::redirect('failures');
+        }
 
         // Blokada: ten sam status
         if ($failure['status_id'] == $newStatusId) {
@@ -279,7 +312,10 @@ class FailureController
         }
 
         $newStatus = (new StatusModel())->getById($newStatusId);
-        if (!$newStatus) { Helpers::flash('error', 'Nieprawidłowy status.'); Helpers::redirect('failure_detail', ['id' => $id]); }
+        if (!$newStatus) {
+            Helpers::flash('error', 'Nieprawidłowy status.');
+            Helpers::redirect('failure_detail', ['id' => $id]);
+        }
 
         // Blokada: nie można ręcznie nadać statusu startowego (błąd 4)
         if (!empty($newStatus['is_initial'])) {
@@ -289,8 +325,12 @@ class FailureController
 
         $user = Auth::user();
         $fm->changeStatus($id, $newStatusId, (bool)$newStatus['is_final']);
-        $fm->addHistory($id, $user['id'], 'status_changed',
-            $failure['status_id'], $newStatusId,
+        $fm->addHistory(
+            $id,
+            $user['id'],
+            'status_changed',
+            $failure['status_id'],
+            $newStatusId,
             $user['name'],
             $note ?: 'Zmiana statusu: ' . $failure['status_label'] . ' → ' . $newStatus['label']
         );
@@ -323,7 +363,8 @@ class FailureController
         Helpers::redirect('failures');
     }
 
-    public function addComment(): void    {
+    public function addComment(): void
+    {
         Auth::requireMechanic();
         if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
             Helpers::flash('error', 'Błąd bezpieczeństwa.');
@@ -359,7 +400,7 @@ class DurController
         $reviews  = $mm->getAllReviews(array_filter($filters), 50, 0);
         $upcoming = $mm->getUpcomingSchedules(DUR_WARNING_DAYS);
         $lines    = (new ProductionLineModel())->getAll(true);
-        $templates= $mm->getTemplates();
+        $templates = $mm->getTemplates();
 
         require BASE_PATH . '/templates/shared/dur_list.php';
     }
@@ -369,7 +410,6 @@ class DurController
         Auth::requireMechanic();
         $lines     = (new ProductionLineModel())->getAll(true);
         $templates = (new MaintenanceModel())->getTemplates();
-        $employees = (new EmployeeModel())->getAll(true);
         require BASE_PATH . '/templates/shared/dur_form.php';
     }
 
@@ -387,8 +427,8 @@ class DurController
         $reviewDate  = $_POST['review_date'] ?? '';
         $reviewType  = $_POST['review_type'] ?? 'monthly';
         $duration    = !empty($_POST['duration_minutes']) ? (int)$_POST['duration_minutes'] : null;
-        $status      = in_array($_POST['status'] ?? '', ['completed','partial','interrupted'])
-                       ? $_POST['status'] : 'completed';
+        $status      = in_array($_POST['status'] ?? '', ['completed', 'partial', 'interrupted'])
+            ? $_POST['status'] : 'completed';
         $nextDate    = $_POST['next_review_date'] ?? null;
         $parts       = trim($_POST['parts_used'] ?? '');
         $notes       = trim($_POST['notes'] ?? '');
@@ -423,7 +463,10 @@ class DurController
         // DUR detail dostepny publicznie (tylko odczyt)
         $id     = (int)($_GET['id'] ?? 0);
         $review = (new MaintenanceModel())->getById($id);
-        if (!$review) { require BASE_PATH . '/templates/shared/404.php'; return; }
+        if (!$review) {
+            require BASE_PATH . '/templates/shared/404.php';
+            return;
+        }
         require BASE_PATH . '/templates/shared/dur_detail.php';
     }
 }
@@ -450,7 +493,10 @@ class AdminController
         }
         $name  = trim($_POST['role_name'] ?? '');
         $label = trim($_POST['role_label'] ?? '');
-        if (!$name) { Helpers::flash('error', 'Brak nazwy roli.'); Helpers::redirect('admin_users'); }
+        if (!$name) {
+            Helpers::flash('error', 'Brak nazwy roli.');
+            Helpers::redirect('admin_users');
+        }
 
         $perms = [
             'report'    => !empty($_POST['perm_report'])    ? 1 : 0,
@@ -489,7 +535,8 @@ class AdminController
         Helpers::redirect('admin_users');
     }
 
-    public function roleAdd(): void    {
+    public function roleAdd(): void
+    {
         Auth::requireAdmin();
         if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
             Helpers::flash('error', 'Błąd bezpieczeństwa.');
@@ -521,18 +568,18 @@ class AdminController
         $id   = (int)($_POST['user_id'] ?? 0);
         $nick = strtolower(trim($_POST['nickname'] ?? ''));
         $name = trim($_POST['name'] ?? '');
-        $email= trim($_POST['email'] ?? '');
+        $email = trim($_POST['email'] ?? '');
         $role = $_POST['role'] ?? 'mechanic';
         $pass = $_POST['password'] ?? '';
         $active = (int)($_POST['is_active'] ?? 1);
 
         if (!$nick || !$name) {
-            Helpers::flash('error', 'Podaj nickname i imię/nazwisko.');
+            Helpers::flash('error', 'Podaj login i imię/nazwisko.');
             Helpers::redirect('admin_users');
         }
         $um = new UserModel();
         if ($um->nicknameExists($nick, $id)) {
-            Helpers::flash('error', 'Nickname "' . Helpers::e($nick) . '" jest już zajęty.');
+            Helpers::flash('error', 'Login "' . Helpers::e($nick) . '" jest już zajęty.');
             Helpers::redirect('admin_users');
         }
 
@@ -544,48 +591,26 @@ class AdminController
         }
         $roleId = $roleRow['id'];
 
-        $data = ['name' => $name, 'nickname' => $nick, 'email' => $email,
-                 'role_id' => $roleId, 'is_active' => $active, 'password' => $pass];
+        $data = [
+            'name' => $name,
+            'nickname' => $nick,
+            'email' => $email,
+            'role_id' => $roleId,
+            'is_active' => $active,
+            'password' => $pass
+        ];
         if ($id > 0) {
             $um->update($id, $data);
             Helpers::flash('success', 'Użytkownik zaktualizowany.');
         } else {
-            if (!$pass) { Helpers::flash('error', 'Podaj hasło dla nowego użytkownika.'); Helpers::redirect('admin_users'); }
+            if (!$pass) {
+                Helpers::flash('error', 'Podaj hasło dla nowego użytkownika.');
+                Helpers::redirect('admin_users');
+            }
             $um->create($data);
             Helpers::flash('success', 'Użytkownik "' . Helpers::e($nick) . '" dodany.');
         }
         Helpers::redirect('admin_users');
-    }
-
-    public function employees(): void
-    {
-        Auth::requireAdmin();
-        $employees = (new EmployeeModel())->getAll();
-        require BASE_PATH . '/templates/admin/employees.php';
-    }
-
-    public function employeeSave(): void
-    {
-        Auth::requireAdmin();
-        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
-            Helpers::flash('error', 'Błąd bezpieczeństwa.');
-            Helpers::redirect('admin_employees');
-        }
-        $id       = (int)($_POST['emp_id'] ?? 0);
-        $acronym  = strtoupper(trim($_POST['acronym'] ?? ''));
-        $name     = trim($_POST['name'] ?? '');
-        $position = trim($_POST['position'] ?? '');
-        $active   = (int)($_POST['is_active'] ?? 1);
-
-        if (!$acronym || !$name) {
-            Helpers::flash('error', 'Podaj akronim i imię/nazwisko.');
-            Helpers::redirect('admin_employees');
-        }
-        $em = new EmployeeModel();
-        $data = ['acronym' => $acronym, 'name' => $name, 'position' => $position, 'is_active' => $active];
-        if ($id > 0) { $em->update($id, $data); Helpers::flash('success', 'Pracownik zaktualizowany.'); }
-        else         { $em->create($data);       Helpers::flash('success', 'Pracownik ' . Helpers::e($acronym) . ' dodany.'); }
-        Helpers::redirect('admin_employees');
     }
 
     /** POPRAWKA 1: Linie z prefixem + podzespoły */
@@ -659,13 +684,27 @@ class AdminController
         $initial = (int)($_POST['is_initial'] ?? 0);
         $final   = (int)($_POST['is_final'] ?? 0);
 
-        if (!$label) { Helpers::flash('error', 'Podaj etykietę statusu.'); Helpers::redirect('admin_statuses'); }
+        if (!$label) {
+            Helpers::flash('error', 'Podaj etykietę statusu.');
+            Helpers::redirect('admin_statuses');
+        }
 
         $sm   = new StatusModel();
-        $data = ['label' => $label, 'color' => $color, 'sort_order' => $order,
-                 'is_active' => $active, 'is_initial' => $initial, 'is_final' => $final];
-        if ($id > 0) { $sm->update($id, $data); Helpers::flash('success', 'Status zaktualizowany.'); }
-        else         { $sm->create($data);       Helpers::flash('success', 'Status "' . Helpers::e($label) . '" dodany.'); }
+        $data = [
+            'label' => $label,
+            'color' => $color,
+            'sort_order' => $order,
+            'is_active' => $active,
+            'is_initial' => $initial,
+            'is_final' => $final
+        ];
+        if ($id > 0) {
+            $sm->update($id, $data);
+            Helpers::flash('success', 'Status zaktualizowany.');
+        } else {
+            $sm->create($data);
+            Helpers::flash('success', 'Status "' . Helpers::e($label) . '" dodany.');
+        }
         Helpers::redirect('admin_statuses');
     }
 
@@ -703,12 +742,20 @@ class AdminController
         $order  = (int)($_POST['sort_order'] ?? 0);
         $active = (int)($_POST['is_active'] ?? 1);
 
-        if (!$label) { Helpers::flash('error', 'Podaj nazwę kategorii.'); Helpers::redirect('admin_dictionary'); }
+        if (!$label) {
+            Helpers::flash('error', 'Podaj nazwę kategorii.');
+            Helpers::redirect('admin_dictionary');
+        }
 
         $cm   = new CategoryModel();
         $data = ['label' => $label, 'color' => $color, 'sort_order' => $order, 'is_active' => $active];
-        if ($id > 0) { $cm->update($id, $data); Helpers::flash('success', 'Kategoria zaktualizowana.'); }
-        else         { $cm->create($data);       Helpers::flash('success', 'Kategoria "' . Helpers::e($label) . '" dodana.'); }
+        if ($id > 0) {
+            $cm->update($id, $data);
+            Helpers::flash('success', 'Kategoria zaktualizowana.');
+        } else {
+            $cm->create($data);
+            Helpers::flash('success', 'Kategoria "' . Helpers::e($label) . '" dodana.');
+        }
         Helpers::redirect('admin_dictionary');
     }
 
@@ -724,7 +771,7 @@ class AdminController
             // Błąd 3: sprawdź czy usterka jest używana w zgłoszeniach
             $usedCount = (new DictionaryModel())->countUsages($id);
             if ($usedCount > 0) {
-                Helpers::flash('error', 'Nie można usunąć tej usterki — jest używana w <strong>'.$usedCount.' zgłoszeniu/zgłoszeniach</strong>. Możesz ją tylko dezaktywować (edycja → Aktywna: Nie).');
+                Helpers::flash('error', 'Nie można usunąć tej usterki — jest używana w <strong>' . $usedCount . ' zgłoszeniu/zgłoszeniach</strong>. Możesz ją tylko dezaktywować (edycja → Aktywna: Nie).');
                 Helpers::redirect('admin_dictionary');
             }
             (new DictionaryModel())->delete($id);
@@ -751,7 +798,7 @@ class AdminController
         }
         $dm = new DictionaryModel();
         if ($dictId > 0) {
-            $dm->update($dictId, ['title'=>$title,'category_id'=>$catId,'description'=>$desc,'is_active'=>$active]);
+            $dm->update($dictId, ['title' => $title, 'category_id' => $catId, 'description' => $desc, 'is_active' => $active]);
             Helpers::flash('success', 'Pozycja "' . Helpers::e($title) . '" zaktualizowana.');
         } else {
             $dm->create(['title' => $title, 'category_id' => $catId, 'description' => $desc]);
@@ -786,14 +833,19 @@ class AdminController
         }
         $mm   = new MaintenanceModel();
         $user = Auth::user();
-        $data = ['name'=>$name,'review_type'=>$reviewType,'checklist'=>$checklist,
-                 'is_active'=>$isActive,'created_by'=>$user['id']];
+        $data = [
+            'name' => $name,
+            'review_type' => $reviewType,
+            'checklist' => $checklist,
+            'is_active' => $isActive,
+            'created_by' => $user['id']
+        ];
         if ($id > 0) {
             $mm->updateTemplate($id, $data);
-            Helpers::flash('success', 'Szablon "'.Helpers::e($name).'" zaktualizowany.');
+            Helpers::flash('success', 'Szablon "' . Helpers::e($name) . '" zaktualizowany.');
         } else {
             $mm->createTemplate($data);
-            Helpers::flash('success', 'Szablon "'.Helpers::e($name).'" dodany.');
+            Helpers::flash('success', 'Szablon "' . Helpers::e($name) . '" dodany.');
         }
         Helpers::redirect('admin_dur_tmpl');
     }
@@ -827,9 +879,14 @@ class AdminController
             Helpers::redirect('admin_dur_sched');
         }
         $mm   = new MaintenanceModel();
-        $data = ['production_line_id'=>$lineId,'template_id'=>$tmplId,
-                 'review_type'=>$reviewType,'interval_days'=>$days,
-                 'next_due_date'=>$nextDate,'is_active'=>$isActive];
+        $data = [
+            'production_line_id' => $lineId,
+            'template_id' => $tmplId,
+            'review_type' => $reviewType,
+            'interval_days' => $days,
+            'next_due_date' => $nextDate,
+            'is_active' => $isActive
+        ];
         if ($id > 0) {
             $mm->updateSchedule($id, $data);
             Helpers::flash('success', 'Harmonogram zaktualizowany.');
@@ -867,33 +924,39 @@ class AdminController
     public function deleteUser(): void
     {
         Auth::requireAdmin();
-        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) { Helpers::flash('error','Błąd CSRF.'); Helpers::redirect('admin_users'); }
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd CSRF.');
+            Helpers::redirect('admin_users');
+        }
         $id = (int)($_POST['user_id'] ?? 0);
         $me = Auth::user();
-        if ($id === (int)($me['id'] ?? 0)) { Helpers::flash('error','Nie możesz usunąć własnego konta.'); Helpers::redirect('admin_users'); }
-        if ($id > 0) { (new UserModel())->delete($id); Helpers::flash('success','Użytkownik usunięty.'); }
+        if ($id === (int)($me['id'] ?? 0)) {
+            Helpers::flash('error', 'Nie możesz usunąć własnego konta.');
+            Helpers::redirect('admin_users');
+        }
+        if ($id > 0) {
+            (new UserModel())->delete($id);
+            Helpers::flash('success', 'Użytkownik usunięty.');
+        }
         Helpers::redirect('admin_users');
-    }
-
-    public function deleteEmployee(): void
-    {
-        Auth::requireAdmin();
-        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) { Helpers::flash('error','Błąd CSRF.'); Helpers::redirect('admin_employees'); }
-        $id = (int)($_POST['emp_id'] ?? 0);
-        if ($id > 0) { (new EmployeeModel())->delete($id); Helpers::flash('success','Pracownik usunięty.'); }
-        Helpers::redirect('admin_employees');
     }
 
     public function deleteLine(): void
     {
         Auth::requireAdmin();
-        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) { Helpers::flash('error','Błąd CSRF.'); Helpers::redirect('admin_lines'); }
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd CSRF.');
+            Helpers::redirect('admin_lines');
+        }
         $id = (int)($_POST['line_id'] ?? 0);
         if ($id > 0) {
             $used = (new ProductionLineModel())->countFailures($id);
-            if ($used > 0) { Helpers::flash('error','Nie można usunąć linii — ma przypisanych '.$used.' zgłoszeń.'); Helpers::redirect('admin_lines'); }
+            if ($used > 0) {
+                Helpers::flash('error', 'Nie można usunąć linii — ma przypisanych ' . $used . ' zgłoszeń.');
+                Helpers::redirect('admin_lines');
+            }
             (new ProductionLineModel())->delete($id);
-            Helpers::flash('success','Linia usunięta.');
+            Helpers::flash('success', 'Linia usunięta.');
         }
         Helpers::redirect('admin_lines');
     }
@@ -901,16 +964,25 @@ class AdminController
     public function deleteStatus(): void
     {
         Auth::requireAdmin();
-        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) { Helpers::flash('error','Błąd CSRF.'); Helpers::redirect('admin_statuses'); }
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd CSRF.');
+            Helpers::redirect('admin_statuses');
+        }
         $id = (int)($_POST['status_id'] ?? 0);
         if ($id > 0) {
             $sm = new StatusModel();
             $s  = $sm->getById($id);
-            if ($s && ($s['is_initial'] || $s['is_final'])) { Helpers::flash('error','Nie można usunąć statusu startowego ani końcowego.'); Helpers::redirect('admin_statuses'); }
+            if ($s && ($s['is_initial'] || $s['is_final'])) {
+                Helpers::flash('error', 'Nie można usunąć statusu startowego ani końcowego.');
+                Helpers::redirect('admin_statuses');
+            }
             $used = $sm->countUsages($id);
-            if ($used > 0) { Helpers::flash('error','Status jest używany w '.$used.' zgłoszeniach — nie można go usunąć. Możesz go dezaktywować.'); Helpers::redirect('admin_statuses'); }
+            if ($used > 0) {
+                Helpers::flash('error', 'Status jest używany w ' . $used . ' zgłoszeniach — nie można go usunąć. Możesz go dezaktywować.');
+                Helpers::redirect('admin_statuses');
+            }
             $sm->delete($id);
-            Helpers::flash('success','Status usunięty.');
+            Helpers::flash('success', 'Status usunięty.');
         }
         Helpers::redirect('admin_statuses');
     }
@@ -922,10 +994,10 @@ class AdminController
             Helpers::flash('error', 'Błąd bezpieczeństwa.');
             Helpers::redirect('admin_dur_tmpl');
         }
-        $keys   = ['weekly','monthly','quarterly','biannual','annual','ad_hoc'];
+        $keys   = ['weekly', 'monthly', 'quarterly', 'biannual', 'annual', 'ad_hoc'];
         $labels = [];
         foreach ($keys as $k) {
-            $v = trim($_POST['type_'.$k] ?? '');
+            $v = trim($_POST['type_' . $k] ?? '');
             if ($v) $labels[$k] = $v;
         }
         (new \App\Models\SettingsModel())->set('dur_type_labels', json_encode($labels));
@@ -936,18 +1008,30 @@ class AdminController
     public function deleteTmpl(): void
     {
         Auth::requireAdmin();
-        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) { Helpers::flash('error','Błąd CSRF.'); Helpers::redirect('admin_dur_tmpl'); }
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd CSRF.');
+            Helpers::redirect('admin_dur_tmpl');
+        }
         $id = (int)($_POST['tmpl_id'] ?? 0);
-        if ($id > 0) { (new MaintenanceModel())->deleteTemplate($id); Helpers::flash('success','Szablon DUR usunięty.'); }
+        if ($id > 0) {
+            (new MaintenanceModel())->deleteTemplate($id);
+            Helpers::flash('success', 'Szablon DUR usunięty.');
+        }
         Helpers::redirect('admin_dur_tmpl');
     }
 
     public function deleteSched(): void
     {
         Auth::requireAdmin();
-        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) { Helpers::flash('error','Błąd CSRF.'); Helpers::redirect('admin_dur_sched'); }
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd CSRF.');
+            Helpers::redirect('admin_dur_sched');
+        }
         $id = (int)($_POST['sched_id'] ?? 0);
-        if ($id > 0) { (new MaintenanceModel())->deleteSchedule($id); Helpers::flash('success','Pozycja harmonogramu usunięta.'); }
+        if ($id > 0) {
+            (new MaintenanceModel())->deleteSchedule($id);
+            Helpers::flash('success', 'Pozycja harmonogramu usunięta.');
+        }
         Helpers::redirect('admin_dur_sched');
     }
 }

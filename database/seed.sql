@@ -20,30 +20,19 @@ INSERT INTO `roles` (`id`, `name`, `label`) VALUES
 -- Jeśli używasz seed.sql bezpośrednio (bez install.php), użyj poniższych wierszy:
 -- Hasła zostaną wygenerowane przez install.php z password_hash() serwera PHP
 -- Uruchom: http://localhost/cmms/install.php
-INSERT INTO `users` (`id`, `role_id`, `name`, `nickname`, `email`, `password_hash`, `is_active`) VALUES
+INSERT INTO `users` (`id`, `role_id`, `name`, `login`, `email`, `password_hash`, `is_active`) VALUES
 (1, 1, 'Administrator',   'admin',    'admin@serwis.local',        '$2y$10$TKh8H1.PfQx37YgCzwiKb.KjNyWgaHb9cbcoQgdIVFlYg7B3Do9B2', 1),
 (2, 2, 'Jan Kowalski',    'mechanik', 'jan.kowalski@serwis.local', '$2y$10$TKh8H1.PfQx37YgCzwiKb.KjNyWgaHb9cbcoQgdIVFlYg7B3Do9B2', 1),
-(3, 2, 'Piotr Nowak',     'pnowak',   'piotr.nowak@serwis.local',  '$2y$10$TKh8H1.PfQx37YgCzwiKb.KjNyWgaHb9cbcoQgdIVFlYg7B3Do9B2', 1);
+(3, 2, 'Kamil Karbowiak',     'kkarb',   'piotr.nowak@serwis.local',  '$2y$10$TKh8H1.PfQx37YgCzwiKb.KjNyWgaHb9cbcoQgdIVFlYg7B3Do9B2', 1);
 -- Powyższy hash odpowiada haslu: password
-
--- ────────────────────────────────────────────────────────────
--- Pracownicy z akronimami
--- ────────────────────────────────────────────────────────────
-INSERT INTO `employees` (`id`, `acronym`, `name`, `position`, `is_active`) VALUES
-(1, 'JKO', 'Jan Kowalski',       'Operator Zm. I',   1),
-(2, 'ANO', 'Anna Nowak',          'Operator Zm. II',  1),
-(3, 'PZA', 'Piotr Zając',         'Mechanik',         1),
-(4, 'MWI', 'Marcin Wiśniewski',   'Mechanik',         1),
-(5, 'EDA', 'Ewa Dąbrowska',       'Mistrz Zm. I',     1),
-(6, 'TLE', 'Tomasz Lewandowski',  'Operator Zm. III', 0);
 
 -- ────────────────────────────────────────────────────────────
 -- Linie produkcyjne — POPRAWKA 1: pole prefix
 -- ────────────────────────────────────────────────────────────
 INSERT INTO `production_lines` (`id`, `name`, `prefix`, `description`, `is_active`) VALUES
 (1, 'Linia 1 - Montaż',    'A1', 'Linia montażu główna',     1),
-(2, 'Linia 2 - Lakiernia', 'L2', 'Linia lakierowania',       1),
-(3, 'Linia 3 - Pakowanie', 'P3', 'Linia pakowania wyrobów',  1),
+(2, 'Linia 2 - Lakiernia', 'A2', 'Linia lakierowania',       1),
+(3, 'Linia 3 - Pakowanie', 'A3', 'Linia pakowania wyrobów',  1),
 (4, 'Linia 4 - Spawalnia', 'W4', 'Linia spawania MIG/MAG',   1),
 (5, 'Linia 5 - CNC',       'C5', 'Obrabiarki CNC',           1);
 
@@ -153,7 +142,7 @@ INSERT INTO `maintenance_reviews`
 INSERT INTO `settings` (`skey`, `svalue`, `label`) VALUES
 ('app_name',         'Moduł Serwis',          'Nazwa aplikacji'),
 ('app_version',      '0.1-dev',               'Wersja systemu'),
-('company_name',     'Twoja Firma Sp. z o.o.','Nazwa firmy'),
+('company_name',     'FINCO Stal Serwis','Nazwa firmy'),
 ('dur_warning_days', '7',                     'Ostrzeżenie DUR (dni przed terminem'),
 ('records_per_page', '25',                    'Liczba rekordów na stronę');
 

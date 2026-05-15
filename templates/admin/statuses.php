@@ -6,7 +6,6 @@ require BASE_PATH . '/templates/shared/header.php';
 
 <div class="atabs mb2">
   <a href="<?= BASE_URL ?>/index.php?route=admin_users"      class="atab">Użytkownicy</a>
-  <a href="<?= BASE_URL ?>/index.php?route=admin_employees"  class="atab">Pracownicy / Akronimy</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_lines"      class="atab">Linie i podzespoły</a>
   <button class="atab active" data-tab="statuses">Statusy</button>
   <a href="<?= BASE_URL ?>/index.php?route=admin_dictionary" class="atab">Słownik awarii</a>

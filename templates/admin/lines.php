@@ -7,7 +7,6 @@ $year = date('Y');
 
 <div class="atabs mb2">
   <a href="<?= BASE_URL ?>/index.php?route=admin_users"      class="atab">Użytkownicy</a>
-  <a href="<?= BASE_URL ?>/index.php?route=admin_employees"  class="atab">Pracownicy / Akronimy</a>
   <button class="atab active" data-tab="lines">Linie i podzespoły</button>
   <a href="<?= BASE_URL ?>/index.php?route=admin_statuses"   class="atab">Statusy</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_dictionary" class="atab">Słownik awarii</a>

@@ -1,7 +1,5 @@
 <?php
-// Moduł Serwis v2 — Front Controller
-// Umieść w: C:\xampp\htdocs\cmms\index.php
-// Adres:    http://localhost/cmms/
+// Moduł Serwis — Front Controller
 
 define('BASE_PATH', __DIR__);
 
@@ -43,8 +41,8 @@ spl_autoload_register(function (string $class): void {
 
 \App\Helpers\Auth::start();
 
-// Domyślna trasa: widok publiczny (formularz zgłoszenia)
-$route = $_GET['route'] ?? 'report';
+// Domyślna trasa: logowanie
+$route = $_GET['route'] ?? 'login';
 
 $routes = [
     'login'               => ['App\\Controllers\\AuthController',    'loginForm'],
@@ -65,8 +63,6 @@ $routes = [
     'dur_detail'          => ['App\\Controllers\\DurController',     'detail'],
     'admin_users'         => ['App\\Controllers\\AdminController',   'users'],
     'admin_user_save'     => ['App\\Controllers\\AdminController',   'userSave'],
-    'admin_employees'     => ['App\\Controllers\\AdminController',   'employees'],
-    'admin_emp_save'      => ['App\\Controllers\\AdminController',   'employeeSave'],
     'admin_lines'         => ['App\\Controllers\\AdminController',   'lines'],
     'admin_line_save'     => ['App\\Controllers\\AdminController',   'lineSave'],
     'admin_statuses'      => ['App\\Controllers\\AdminController',   'statuses'],
@@ -85,8 +81,7 @@ $routes = [
     'admin_tmpl_save'     => ['App\\Controllers\\AdminController',   'tmplSave'],
     'admin_sched_save'    => ['App\\Controllers\\AdminController',   'schedSave'],
     'check_duplicate'     => ['App\\Controllers\\AjaxController',    'checkDuplicate'],
-    'admin_user_delete'   => ['App\\Controllers\\AdminController',   'deleteUser'],
-    'admin_emp_delete'    => ['App\\Controllers\\AdminController',   'deleteEmployee'],
+    'admin_user_delete'   => ['App\\Controllers\\AdminController',   'deleteUser'], 
     'admin_line_delete'   => ['App\\Controllers\\AdminController',   'deleteLine'],
     'admin_status_delete' => ['App\\Controllers\\AdminController',   'deleteStatus'],
     'admin_tmpl_delete'   => ['App\\Controllers\\AdminController',   'deleteTmpl'],

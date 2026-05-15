@@ -8,7 +8,6 @@ require BASE_PATH . '/templates/shared/header.php';
 <div class="atabs mb2">
   <button class="atab active" onclick="showUsersTab('users',this)">Użytkownicy</button>
   <button class="atab" onclick="showUsersTab('roles',this)">Role i uprawnienia</button>
-  <a href="<?= BASE_URL ?>/index.php?route=admin_employees" class="atab">Pracownicy / Akronimy</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_lines"     class="atab">Linie i podzespoły</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_statuses"  class="atab">Statusy</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_dictionary" class="atab">Słownik awarii</a>
@@ -26,7 +25,7 @@ require BASE_PATH . '/templates/shared/header.php';
       <table>
         <thead><tr>
           <th>Imię i nazwisko</th>
-          <th>Nickname</th>
+          <th>Login</th>
           <th>Email</th>
           <th>Rola</th>
           <th>Aktywny</th>
@@ -36,12 +35,12 @@ require BASE_PATH . '/templates/shared/header.php';
         <?php foreach ($users as $u): ?>
         <tr>
           <td class="fw6"><?= Helpers::e($u['name']) ?></td>
-          <td class="mono fs-sm" style="color:#0a2463;font-weight:700;"><?= Helpers::e($u['nickname']) ?></td>
+          <td class="mono fs-sm" style="color:#0a2463;font-weight:700;"><?= Helpers::e($u['login']) ?></td>
           <td class="muted fs-sm"><?= Helpers::e($u['email']) ?></td>
           <td><?= Helpers::statusBadge($u['role_label'], $u['role_name'] === 'admin' ? '#0a2463' : '#1e3a8a') ?></td>
           <td><?= Helpers::statusBadge($u['is_active'] ? 'Tak' : 'Nie', $u['is_active'] ? '#16a34a' : '#6b7280') ?></td>
           <td>
-            <button class="btn btn-sm" onclick="editUser(<?= $u['id'] ?>,'<?= Helpers::e($u['name']) ?>','<?= Helpers::e($u['nickname']) ?>','<?= Helpers::e($u['email']) ?>','<?= $u['role_name'] ?>',<?= $u['is_active'] ?>)">
+            <button class="btn btn-sm" onclick="editUser(<?= $u['id'] ?>,'<?= Helpers::e($u['name']) ?>','<?= Helpers::e($u['login']) ?>','<?= Helpers::e($u['email']) ?>','<?= $u['role_name'] ?>',<?= $u['is_active'] ?>)">
               Edytuj
             </button>
             <form method="POST" action="<?= BASE_URL ?>/index.php?route=admin_user_delete" style="display:inline;" onsubmit="return confirm('Usunąć użytkownika <?= Helpers::e($u['name']) ?>?');">

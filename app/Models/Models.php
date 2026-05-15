@@ -43,13 +43,12 @@ abstract class BaseModel
 // ────────────────────────────────────────────────────────────
 class UserModel extends BaseModel
 {
-    /** POPRAWKA 5: szukaj po nickname zamiast email */
     public function findByNickname(string $nickname): ?array
     {
         return $this->fetchOne(
-            "SELECT u.*, r.name AS role_name, r.label AS role_label
+            "SELECT u.*, r.name AS role_name
              FROM users u JOIN roles r ON r.id = u.role_id
-             WHERE u.nickname = ? AND u.is_active = 1",
+             WHERE u.login = ? AND u.is_active = 1",
             [strtolower($nickname)]
         );
     }
@@ -66,21 +65,26 @@ class UserModel extends BaseModel
     public function create(array $d): int
     {
         return $this->execute(
-            "INSERT INTO users (role_id, name, nickname, email, password_hash, is_active)
+            "INSERT INTO users (role_id, name, login, email, password_hash, is_active)
              VALUES (?, ?, ?, ?, ?, ?)",
-            [$d['role_id'], $d['name'], strtolower($d['nickname']), $d['email'],
-             password_hash($d['password'], PASSWORD_BCRYPT, ['cost'=>12]),
-             $d['is_active'] ?? 1]
+            [
+                $d['role_id'],
+                $d['name'],
+                strtolower($d['nickname']),
+                $d['email'],
+                password_hash($d['password'], PASSWORD_BCRYPT, ['cost' => 10]),
+                $d['is_active']
+            ]
         );
     }
 
     public function update(int $id, array $d): void
     {
-        $sets   = ['name = ?', 'nickname = ?', 'email = ?', 'role_id = ?', 'is_active = ?'];
+        $sets   = ['name = ?', 'login = ?', 'email = ?', 'role_id = ?', 'is_active = ?'];
         $params = [$d['name'], strtolower($d['nickname']), $d['email'], $d['role_id'], $d['is_active']];
         if (!empty($d['password'])) {
             $sets[]   = 'password_hash = ?';
-            $params[] = password_hash($d['password'], PASSWORD_BCRYPT, ['cost'=>12]);
+            $params[] = password_hash($d['password'], PASSWORD_BCRYPT, ['cost' => 12]);
         }
         $params[] = $id;
         $this->execute("UPDATE users SET " . implode(', ', $sets) . " WHERE id = ?", $params);
@@ -93,11 +97,10 @@ class UserModel extends BaseModel
 
     public function nicknameExists(string $nickname, int $excludeId = 0): bool
     {
-        $row = $this->fetchOne(
-            "SELECT id FROM users WHERE nickname = ? AND id != ?",
+        return (bool)$this->fetchOne(
+            "SELECT id FROM users WHERE login = ? AND id != ?",
             [strtolower($nickname), $excludeId]
         );
-        return (bool) $row;
     }
 
     public function delete(int $id): void
@@ -288,7 +291,10 @@ class DictionaryModel extends BaseModel
     {
         $where  = 'WHERE fd.is_active = 1';
         $params = [];
-        if ($categoryId) { $where .= ' AND fd.category_id = ?'; $params[] = $categoryId; }
+        if ($categoryId) {
+            $where .= ' AND fd.category_id = ?';
+            $params[] = $categoryId;
+        }
         return $this->fetchAll(
             "SELECT fd.*, fc.label AS cat_label, fc.color AS cat_color
              FROM failure_dictionary fd
@@ -374,9 +380,15 @@ class StatusModel extends BaseModel
     {
         $this->execute(
             "UPDATE failure_statuses SET label = ?, color = ?, sort_order = ?, is_initial = ?, is_final = ?, is_active = ? WHERE id = ?",
-            [$d['label'], $d['color'], $d['sort_order'],
-             $d['is_initial'] ?? 0, $d['is_final'] ?? 0,
-             $d['is_active'], $id]
+            [
+                $d['label'],
+                $d['color'],
+                $d['sort_order'],
+                $d['is_initial'] ?? 0,
+                $d['is_final'] ?? 0,
+                $d['is_active'],
+                $id
+            ]
         );
     }
 
@@ -416,11 +428,24 @@ class FailureModel extends BaseModel
     {
         $where  = ['1=1'];
         $params = [];
-        if (!empty($filters['status_id']))  { $where[] = 'f.status_id = ?';            $params[] = $filters['status_id']; }
-        if (!empty($filters['line_id']))    { $where[] = 'f.production_line_id = ?';   $params[] = $filters['line_id']; }
-        if (!empty($filters['category_id'])){ $where[] = 'f.category_id = ?';          $params[] = $filters['category_id']; }
-        if (!empty($filters['search']))     { $where[] = '(f.ticket_number LIKE ? OR f.description LIKE ?)';
-                                              $s = '%'.$filters['search'].'%'; $params[] = $s; $params[] = $s; }
+        if (!empty($filters['status_id'])) {
+            $where[] = 'f.status_id = ?';
+            $params[] = $filters['status_id'];
+        }
+        if (!empty($filters['line_id'])) {
+            $where[] = 'f.production_line_id = ?';
+            $params[] = $filters['line_id'];
+        }
+        if (!empty($filters['category_id'])) {
+            $where[] = 'f.category_id = ?';
+            $params[] = $filters['category_id'];
+        }
+        if (!empty($filters['search'])) {
+            $where[] = '(f.ticket_number LIKE ? OR f.description LIKE ?)';
+            $s = '%' . $filters['search'] . '%';
+            $params[] = $s;
+            $params[] = $s;
+        }
         $sql = $this->baseSelect()
             . ' WHERE ' . implode(' AND ', $where)
             . ' ORDER BY f.created_at DESC'
@@ -432,11 +457,24 @@ class FailureModel extends BaseModel
     {
         $where  = ['1=1'];
         $params = [];
-        if (!empty($filters['status_id']))   { $where[] = 'f.status_id = ?';          $params[] = $filters['status_id']; }
-        if (!empty($filters['line_id']))     { $where[] = 'f.production_line_id = ?'; $params[] = $filters['line_id']; }
-        if (!empty($filters['category_id'])){ $where[] = 'f.category_id = ?';        $params[] = $filters['category_id']; }
-        if (!empty($filters['search']))     { $where[] = '(f.ticket_number LIKE ? OR f.description LIKE ?)';
-                                              $s = '%'.$filters['search'].'%'; $params[] = $s; $params[] = $s; }
+        if (!empty($filters['status_id'])) {
+            $where[] = 'f.status_id = ?';
+            $params[] = $filters['status_id'];
+        }
+        if (!empty($filters['line_id'])) {
+            $where[] = 'f.production_line_id = ?';
+            $params[] = $filters['line_id'];
+        }
+        if (!empty($filters['category_id'])) {
+            $where[] = 'f.category_id = ?';
+            $params[] = $filters['category_id'];
+        }
+        if (!empty($filters['search'])) {
+            $where[] = '(f.ticket_number LIKE ? OR f.description LIKE ?)';
+            $s = '%' . $filters['search'] . '%';
+            $params[] = $s;
+            $params[] = $s;
+        }
         $st = $this->db->prepare(
             "SELECT COUNT(*) FROM failures f WHERE " . implode(' AND ', $where)
         );
@@ -484,10 +522,15 @@ class FailureModel extends BaseModel
         );
     }
 
-    public function addHistory(int $failureId, ?int $userId, string $action,
-                               ?int $oldStatusId, ?int $newStatusId,
-                               string $actorName, ?string $note = null): void
-    {
+    public function addHistory(
+        int $failureId,
+        ?int $userId,
+        string $action,
+        ?int $oldStatusId,
+        ?int $newStatusId,
+        string $actorName,
+        ?string $note = null
+    ): void {
         $this->execute(
             "INSERT INTO failure_history
              (failure_id, user_id, actor_name, action, old_status_id, new_status_id, note)
@@ -542,8 +585,13 @@ class FailureModel extends BaseModel
     /** Statystyki linii — POPRAWKA 9: zwraca dane do obliczenia śr. czasu naprawy */
     public function getLineStats(int $lineId, int $days = 30): array
     {
-        $empty = ['total' => 0, 'open_count' => 0, 'closed_count' => 0,
-                  'avg_repair_minutes' => null, 'avg_repair_str' => '—'];
+        $empty = [
+            'total' => 0,
+            'open_count' => 0,
+            'closed_count' => 0,
+            'avg_repair_minutes' => null,
+            'avg_repair_str' => '—'
+        ];
 
         $row = $this->fetchOne(
             "SELECT
@@ -631,15 +679,24 @@ class MaintenanceModel extends BaseModel
     {
         $where  = ['1=1'];
         $params = [];
-        if (!empty($filters['line_id']))  { $where[] = 'mr.production_line_id = ?'; $params[] = $filters['line_id']; }
-        if (!empty($filters['status']))   { $where[] = 'mr.status = ?';             $params[] = $filters['status']; }
-        if (!empty($filters['type']))     { $where[] = 'mr.review_type = ?';        $params[] = $filters['type']; }
+        if (!empty($filters['line_id'])) {
+            $where[] = 'mr.production_line_id = ?';
+            $params[] = $filters['line_id'];
+        }
+        if (!empty($filters['status'])) {
+            $where[] = 'mr.status = ?';
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['type'])) {
+            $where[] = 'mr.review_type = ?';
+            $params[] = $filters['type'];
+        }
 
         return $this->fetchAll(
             "SELECT mr.*,
                 pl.name AS line_name,
                 ls.name AS subsystem_name,
-                u.name  AS performer_name, u.nickname AS performer_nick
+                u.name  AS performer_name, u.login AS performer_nick
              FROM maintenance_reviews mr
              JOIN production_lines pl ON pl.id = mr.production_line_id
              LEFT JOIN line_subsystems ls ON ls.id = mr.subsystem_id
@@ -746,8 +803,13 @@ class MaintenanceModel extends BaseModel
             "INSERT INTO maintenance_templates
              (name, review_type, checklist, is_active, created_by)
              VALUES (?, ?, ?, ?, ?)",
-            [$d['name'], $d['review_type'], $d['checklist'] ?? null,
-             $d['is_active'] ?? 1, $d['created_by'] ?? null]
+            [
+                $d['name'],
+                $d['review_type'],
+                $d['checklist'] ?? null,
+                $d['is_active'] ?? 1,
+                $d['created_by'] ?? null
+            ]
         );
     }
 
@@ -757,8 +819,13 @@ class MaintenanceModel extends BaseModel
             "UPDATE maintenance_templates
              SET name=?, review_type=?, checklist=?, is_active=?
              WHERE id=?",
-            [$d['name'], $d['review_type'], $d['checklist'] ?? null,
-             $d['is_active'] ?? 1, $id]
+            [
+                $d['name'],
+                $d['review_type'],
+                $d['checklist'] ?? null,
+                $d['is_active'] ?? 1,
+                $id
+            ]
         );
     }
 
@@ -768,9 +835,14 @@ class MaintenanceModel extends BaseModel
             "INSERT INTO maintenance_schedules
              (production_line_id, template_id, review_type, interval_days, next_due_date, is_active)
              VALUES (?, ?, ?, ?, ?, ?)",
-            [$d['production_line_id'], $d['template_id'],
-             $d['review_type'], $d['interval_days'],
-             $d['next_due_date'], $d['is_active'] ?? 1]
+            [
+                $d['production_line_id'],
+                $d['template_id'],
+                $d['review_type'],
+                $d['interval_days'],
+                $d['next_due_date'],
+                $d['is_active'] ?? 1
+            ]
         );
     }
 
@@ -781,9 +853,15 @@ class MaintenanceModel extends BaseModel
              SET production_line_id=?, template_id=?, review_type=?,
                  interval_days=?, next_due_date=?, is_active=?
              WHERE id=?",
-            [$d['production_line_id'], $d['template_id'],
-             $d['review_type'], $d['interval_days'],
-             $d['next_due_date'], $d['is_active'] ?? 1, $id]
+            [
+                $d['production_line_id'],
+                $d['template_id'],
+                $d['review_type'],
+                $d['interval_days'],
+                $d['next_due_date'],
+                $d['is_active'] ?? 1,
+                $id
+            ]
         );
     }
 
@@ -863,7 +941,7 @@ class RoleModel extends BaseModel
         // Domyślne uprawnienia dla nowej roli (tylko zgłaszanie)
         $this->execute(
             "INSERT IGNORE INTO settings (skey, svalue, label) VALUES (?, ?, ?)",
-            ['role_perms_'.$name, json_encode(['report'=>1]), 'Uprawnienia roli: '.$label]
+            ['role_perms_' . $name, json_encode(['report' => 1]), 'Uprawnienia roli: ' . $label]
         );
     }
 
@@ -876,9 +954,9 @@ class RoleModel extends BaseModel
             $result[$roleName] = json_decode($r['svalue'], true) ?? [];
         }
         // Domyślne uprawnienia dla wbudowanych ról jeśli brak w bazie
-        if (!isset($result['admin']))    $result['admin']    = ['report'=>1,'dashboard'=>1,'failures'=>1,'dur'=>1,'statuses'=>1,'admin'=>1];
-        if (!isset($result['mechanic'])) $result['mechanic'] = ['dashboard'=>1,'failures'=>1,'dur'=>1,'statuses'=>1];
-        if (!isset($result['operator'])) $result['operator'] = ['report'=>1,'dur'=>1];
+        if (!isset($result['admin']))    $result['admin']    = ['report' => 1, 'dashboard' => 1, 'failures' => 1, 'dur' => 1, 'statuses' => 1, 'admin' => 1];
+        if (!isset($result['mechanic'])) $result['mechanic'] = ['dashboard' => 1, 'failures' => 1, 'dur' => 1, 'statuses' => 1];
+        if (!isset($result['operator'])) $result['operator'] = ['report' => 1, 'dur' => 1];
         return $result;
     }
 
@@ -890,7 +968,7 @@ class RoleModel extends BaseModel
         $this->execute(
             "INSERT INTO settings (skey, svalue, label) VALUES (?, ?, ?)
              ON DUPLICATE KEY UPDATE svalue = VALUES(svalue)",
-            ['role_perms_'.$name, json_encode($perms), 'Uprawnienia roli: '.$label]
+            ['role_perms_' . $name, json_encode($perms), 'Uprawnienia roli: ' . $label]
         );
     }
 }
