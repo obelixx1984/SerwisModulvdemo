@@ -1,8 +1,6 @@
 <?php
 // templates/shared/my_failures.php
-// ZMIANY:
-// 3a. Nagłówek kolumny "Linia" → "Linia / Podzespół"
-// 3b. Modal edycji: dodano informację o podzespole
+// ZMIANA: obsługa other_symptom w kolumnie "Objaw" i modalu edycji
 
 use App\Helpers\Helpers;
 use App\Helpers\Auth;
@@ -64,9 +62,7 @@ require BASE_PATH . '/templates/shared/header.php';
     margin-bottom: 14px;
     font-size: 13px;
     color: #374151;
-    line-height: 1.7;
   }
-  .edit-modal-meta strong { color: #0a2463; }
   .other-cb-row {
     display: flex;
     align-items: center;
@@ -83,11 +79,7 @@ require BASE_PATH . '/templates/shared/header.php';
   }
 </style>
 
-<div class="sh mb2">
-  <div>
-    <div class="sh-title">📋 Moje zgłoszenia</div>
-    <div class="muted fs-sm" style="margin-top:2px;">Awarie zgłoszone przez Ciebie — możesz edytować te ze statusem startowym.</div>
-  </div>
+<div class="mb2" style="display:flex;justify-content:flex-end;">
   <a href="<?= BASE_URL ?>/index.php?route=report" class="btn btn-p btn-sm">+ Nowe zgłoszenie</a>
 </div>
 
@@ -109,7 +101,7 @@ require BASE_PATH . '/templates/shared/header.php';
         <thead>
           <tr>
             <th>Numer</th>
-            <th>Linia / Podzespół</th><?php /* ZMIANA 3a */ ?>
+            <th>Linia / Podzespół</th>
             <th>Objaw</th>
             <th>Status</th>
             <th>Data zgłoszenia</th>
@@ -128,7 +120,13 @@ require BASE_PATH . '/templates/shared/header.php';
             $isFinal = !empty($f['status_is_final']);
           ?>
           <tr>
-            <td><span class="mono fw6" style="color:#0a2463;"><?= Helpers::e($f['ticket_number']) ?></span></td>
+            <td>
+              <a href="<?= BASE_URL ?>/index.php?route=failure_detail&id=<?= (int)$f['id'] ?>"
+                 class="mono fw6" style="color:#0a2463;text-decoration:none;"
+                 title="Kliknij aby zobaczyć szczegóły zgłoszenia">
+                <?= Helpers::e($f['ticket_number']) ?>
+              </a>
+            </td>
             <td>
               <?= Helpers::e($f['line_name']) ?>
               <?php if ($f['subsystem_name']): ?>
@@ -136,6 +134,7 @@ require BASE_PATH . '/templates/shared/header.php';
               <?php endif; ?>
             </td>
 
+            <?php /* ZMIANA: kolumna Objaw uwzględnia other_symptom */ ?>
             <td class="fs-sm">
               <?php if (!empty($f['other_symptom'])): ?>
                 <?php
@@ -158,7 +157,6 @@ require BASE_PATH . '/templates/shared/header.php';
             <td class="muted fs-sm"><?= date('d.m.Y H:i', strtotime($f['created_at'])) ?></td>
             <td style="text-align:center;white-space:nowrap;">
               <?php if ($statusIsInitial && !$isFinal): ?>
-                <?php /* ZMIANA 3b: nowy 4. argument — subsystem_name */ ?>
                 <button
                   type="button"
                   class="btn btn-p btn-sm"
@@ -172,7 +170,7 @@ require BASE_PATH . '/templates/shared/header.php';
                     <?= !empty($f['other_symptom']) ? 'true' : 'false' ?>,
                     <?= Helpers::e(json_encode($f['description'] ?? '')) ?>
                   )">
-                  ✏ Edytuj
+                  Edytuj
                 </button>
               <?php else: ?>
                 <span class="muted fs-sm">—</span>
@@ -194,25 +192,22 @@ require BASE_PATH . '/templates/shared/header.php';
   <div class="edit-modal-box" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
 
     <div class="edit-modal-head">
-      <span id="editModalTitle">✏ Edytuj objaw awarii</span>
+      <span id="editModalTitle">Edytuj objaw awarii</span>
       <button class="edit-modal-close" onclick="closeEditModal()" type="button" aria-label="Zamknij">×</button>
     </div>
 
     <div class="edit-modal-body">
-
-      <?php /* ZMIANA 3b: meta z osobnymi wierszami — linia i opcjonalny podzespół */ ?>
       <div class="edit-modal-meta">
         <div>Zgłoszenie: <strong id="editModalTicket">—</strong></div>
         <div>Linia: <span id="editModalLine">—</span></div>
-        <div id="editModalSubsystemRow" style="display:none;">
-          Podzespół: <strong id="editModalSubsystem" style="color:#374151;">—</strong>
-        </div>
+        <div id="editModalSubsystemRow" style="display:none;">Podzespół: <strong id="editModalSubsystem" style="color:#374151;">—</strong></div>
       </div>
 
       <form method="POST" action="<?= BASE_URL ?>/index.php?route=my_failure_edit" id="editSymptomForm">
         <input type="hidden" name="csrf_token" value="<?= Auth::csrfToken() ?>">
         <input type="hidden" name="failure_id" id="editFailureId" value="">
 
+        <?php /* ZMIANA: checkbox "Inne objawy" w modalu edycji */ ?>
         <label class="other-cb-row">
           <input
             type="checkbox"
@@ -227,7 +222,7 @@ require BASE_PATH . '/templates/shared/header.php';
 
         <div id="editSymptomGrp">
           <div class="fg">
-            <label class="flbl">Objaw awarii <span class="req">*</span></label>
+            <label class="flbl">Objaw awarii <span class="req" id="editSymptomReq">*</span></label>
             <select name="symptom_id" id="editSymptomSelect" class="fc" required>
               <option value="">— Wybierz objaw —</option>
               <?php foreach ($symptoms as $sym): ?>
@@ -257,13 +252,11 @@ require BASE_PATH . '/templates/shared/header.php';
 </div>
 
 <script>
-// ZMIANA 3b: 4. argument to subsystemName (pozostałe przesunięte o 1)
 function openEditModal(failureId, ticket, lineName, subsystemName, currentSymptomId, isOtherSymptom, currentDesc) {
   document.getElementById('editFailureId').value         = failureId;
   document.getElementById('editModalTicket').textContent = ticket;
   document.getElementById('editModalLine').textContent   = lineName;
 
-  // Podzespół — pokaż tylko gdy istnieje
   var subsRow = document.getElementById('editModalSubsystemRow');
   if (subsystemName && subsystemName.trim() !== '') {
     document.getElementById('editModalSubsystem').textContent = subsystemName;

@@ -1,9 +1,12 @@
 -- ============================================================
 -- Moduł Serwis v2 — Schemat bazy danych
 -- Kompatybilny z MySQL 5.7+ / MariaDB 10.3+
+-- ZMIANA: dodano kolumnę other_symptom do tabeli failures
+--         (scalono z migration_other_symptom.sql)
+--         Pliki install.sql i migration_other_symptom.sql
+--         zostały usunięte — ten plik jest jedynym źródłem schematu.
 -- ============================================================
 SET NAMES utf8mb4;
-
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ────────────────────────────────────────────────────────────
@@ -19,7 +22,7 @@ CREATE TABLE IF NOT EXISTS `roles` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
--- użytkownicy — POPRAWKA 5: pole login do logowania (zamiast e-mail)
+-- użytkownicy
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `users` (
     `id`            INT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -41,7 +44,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
--- linie produkcyjne — POPRAWKA 1: pole prefix + ticket_counter per linia per rok
+-- linie produkcyjne
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `production_lines` (
     `id`          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -73,20 +76,20 @@ CREATE TABLE IF NOT EXISTS `line_subsystems` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
--- liczniki zgłoszeń per linia per rok — POPRAWKA 1
+-- liczniki zgłoszeń per linia per rok
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `ticket_counters` (
-    `id`                  INT UNSIGNED   NOT NULL AUTO_INCREMENT,
-    `production_line_id`  INT UNSIGNED   NOT NULL,
+    `id`                  INT UNSIGNED      NOT NULL AUTO_INCREMENT,
+    `production_line_id`  INT UNSIGNED      NOT NULL,
     `year`                SMALLINT UNSIGNED NOT NULL,
-    `counter`             INT UNSIGNED   NOT NULL DEFAULT 0,
+    `counter`             INT UNSIGNED      NOT NULL DEFAULT 0,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_counter_line_year` (`production_line_id`, `year`),
     CONSTRAINT `fk_counter_line` FOREIGN KEY (`production_line_id`) REFERENCES `production_lines` (`id`) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
--- kategorie awarii — POPRAWKA 11: dynamiczne z kolorem
+-- kategorie awarii
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `failure_categories` (
     `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -121,7 +124,7 @@ CREATE TABLE IF NOT EXISTS `failure_dictionary` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
--- statusy zgłoszeń — POPRAWKA 6: dynamiczne, bez unique name
+-- statusy zgłoszeń
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `failure_statuses` (
     `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -140,7 +143,7 @@ CREATE TABLE IF NOT EXISTS `failure_statuses` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
--- objawy awarii — Zmiana 1: wybierane przez zgłaszającego
+-- objawy awarii — wybierane przez zgłaszającego
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `failure_symptoms` (
     `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -156,26 +159,25 @@ CREATE TABLE IF NOT EXISTS `failure_symptoms` (
 
 -- ────────────────────────────────────────────────────────────
 -- zgłoszenia awarii
--- POPRAWKA 1: ticket_number w formacie 0001/PREFIX/ROK
--- POPRAWKA 3: usunięto assigned_to (mechanik nie jest przypisywany)
--- Zmiana 1: symptom_id (wybrany przez zgłaszającego), category_id teraz NULL
--- Zmiana 2: other_failure + mechanic_note (ustawia mechanik)
--- Zmiana 3: reporter_user_id — powiązanie zgłoszenia z kontem użytkownika
+-- ZMIANA: dodano kolumnę other_symptom po symptom_id
+--         (wcześniej w migration_other_symptom.sql)
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `failures` (
     `id`                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `ticket_number`       VARCHAR(30)  NOT NULL COMMENT 'Format: 0001/PREFIX/ROK',
     `production_line_id`  INT UNSIGNED NOT NULL,
     `subsystem_id`        INT UNSIGNED NULL  COMMENT 'Opcjonalny podzespół linii',
-    `symptom_id`          INT UNSIGNED NULL  COMMENT 'Zmiana 1: objaw wybrany przez zgłaszającego',
-    `category_id`         INT UNSIGNED NULL  COMMENT 'Zmiana 1: rodzaj awarii — ustawia mechanik (było NOT NULL)',
+    `symptom_id`          INT UNSIGNED NULL  COMMENT 'Objaw wybrany przez zgłaszającego',
+    `other_symptom`       TINYINT(1)   NOT NULL DEFAULT 0
+                          COMMENT '1 = zgłaszający wybrał "Inne objawy" — opis w polu description',
+    `category_id`         INT UNSIGNED NULL  COMMENT 'Rodzaj awarii — ustawia mechanik',
     `status_id`           INT UNSIGNED NOT NULL,
     `dictionary_item_id`  INT UNSIGNED NULL,
-    `other_failure`       TINYINT(1)   NOT NULL DEFAULT 0 COMMENT 'Zmiana 2: 1 = mechanik zaznaczył Inna usterka',
-    `mechanic_note`       TEXT         NULL   COMMENT 'Zmiana 2: notatka mechanika przy Inna usterka',
+    `other_failure`       TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '1 = mechanik zaznaczył Inna usterka',
+    `mechanic_note`       TEXT         NULL   COMMENT 'Notatka mechanika przy Inna usterka',
     `reporter_acronym`    VARCHAR(10)  NULL   COMMENT 'Login/akronim zgłaszającego',
     `reporter_name`       VARCHAR(150) NULL   COMMENT 'Pełna nazwa zgłaszającego',
-    `reporter_user_id`    INT UNSIGNED NULL   COMMENT 'Zmiana 3: ID konta zgłaszającego (users.id)',
+    `reporter_user_id`    INT UNSIGNED NULL   COMMENT 'ID konta zgłaszającego (users.id)',
     `description`         TEXT         NULL,
     `closed_at`           DATETIME     NULL   COMMENT 'Wypełniany przy statusie końcowym',
     `created_at`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -232,8 +234,8 @@ CREATE TABLE IF NOT EXISTS `failure_history` (
     PRIMARY KEY (`id`),
     KEY `idx_history_failure` (`failure_id`),
     KEY `idx_history_user`    (`user_id`),
-    CONSTRAINT `fk_history_failure`    FOREIGN KEY (`failure_id`)    REFERENCES `failures` (`id`)        ON DELETE CASCADE,
-    CONSTRAINT `fk_history_user`       FOREIGN KEY (`user_id`)       REFERENCES `users` (`id`)           ON DELETE SET NULL,
+    CONSTRAINT `fk_history_failure`    FOREIGN KEY (`failure_id`)    REFERENCES `failures` (`id`)         ON DELETE CASCADE,
+    CONSTRAINT `fk_history_user`       FOREIGN KEY (`user_id`)       REFERENCES `users` (`id`)            ON DELETE SET NULL,
     CONSTRAINT `fk_history_old_status` FOREIGN KEY (`old_status_id`) REFERENCES `failure_statuses` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_history_new_status` FOREIGN KEY (`new_status_id`) REFERENCES `failure_statuses` (`id`) ON DELETE SET NULL
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
@@ -245,12 +247,7 @@ CREATE TABLE IF NOT EXISTS `maintenance_templates` (
     `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `name`        VARCHAR(150) NOT NULL,
     `review_type` ENUM(
-        'weekly',
-        'monthly',
-        'quarterly',
-        'biannual',
-        'annual',
-        'ad_hoc'
+        'weekly', 'monthly', 'quarterly', 'biannual', 'annual', 'ad_hoc'
     ) NOT NULL DEFAULT 'monthly',
     `description` TEXT         NULL,
     `checklist`   TEXT         NULL COMMENT 'Jedna czynność per linia tekstu',
@@ -270,12 +267,7 @@ CREATE TABLE IF NOT EXISTS `maintenance_schedules` (
     `production_line_id`  INT UNSIGNED NOT NULL,
     `template_id`         INT UNSIGNED NULL,
     `review_type`         ENUM(
-        'weekly',
-        'monthly',
-        'quarterly',
-        'biannual',
-        'annual',
-        'ad_hoc'
+        'weekly', 'monthly', 'quarterly', 'biannual', 'annual', 'ad_hoc'
     ) NOT NULL,
     `interval_days`  INT UNSIGNED NOT NULL DEFAULT 30,
     `next_due_date`  DATE         NULL,
@@ -300,34 +292,26 @@ CREATE TABLE IF NOT EXISTS `maintenance_reviews` (
     `schedule_id`         INT UNSIGNED NULL,
     `performed_by`        INT UNSIGNED NOT NULL,
     `review_type`         ENUM(
-        'weekly',
-        'monthly',
-        'quarterly',
-        'biannual',
-        'annual',
-        'ad_hoc'
-    ) NOT NULL DEFAULT 'monthly',
-    `review_date`       DATE         NOT NULL,
-    `duration_minutes`  INT UNSIGNED NULL,
-    `activities`        TEXT         NOT NULL,
-    `parts_used`        TEXT         NULL,
-    `notes`             TEXT         NULL,
-    `status`            ENUM(
-        'completed',
-        'partial',
-        'interrupted'
-    ) NOT NULL DEFAULT 'completed',
-    `next_review_date`  DATE         NULL,
-    `created_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        'weekly', 'monthly', 'quarterly', 'biannual', 'annual', 'ad_hoc'
+    ) NOT NULL,
+    `review_date`         DATE         NOT NULL,
+    `duration_minutes`    INT UNSIGNED NULL,
+    `activities`          TEXT         NOT NULL,
+    `parts_used`          TEXT         NULL,
+    `notes`               TEXT         NULL,
+    `status`              ENUM('completed', 'partial', 'interrupted') NOT NULL DEFAULT 'completed',
+    `next_review_date`    DATE         NULL,
+    `created_at`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_rev_line`      (`production_line_id`),
-    KEY `idx_rev_date`      (`review_date`),
-    KEY `idx_rev_performer` (`performed_by`),
+    KEY `idx_rev_line`     (`production_line_id`),
+    KEY `idx_rev_date`     (`review_date`),
+    KEY `idx_rev_type`     (`review_type`),
+    KEY `idx_rev_performer`(`performed_by`),
     CONSTRAINT `fk_rev_line`      FOREIGN KEY (`production_line_id`) REFERENCES `production_lines` (`id`),
-    CONSTRAINT `fk_rev_subsystem` FOREIGN KEY (`subsystem_id`)       REFERENCES `line_subsystems` (`id`)         ON DELETE SET NULL,
-    CONSTRAINT `fk_rev_template`  FOREIGN KEY (`template_id`)        REFERENCES `maintenance_templates` (`id`)   ON DELETE SET NULL,
-    CONSTRAINT `fk_rev_schedule`  FOREIGN KEY (`schedule_id`)        REFERENCES `maintenance_schedules` (`id`)   ON DELETE SET NULL,
+    CONSTRAINT `fk_rev_subsystem` FOREIGN KEY (`subsystem_id`)       REFERENCES `line_subsystems` (`id`)      ON DELETE SET NULL,
+    CONSTRAINT `fk_rev_template`  FOREIGN KEY (`template_id`)        REFERENCES `maintenance_templates` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_rev_schedule`  FOREIGN KEY (`schedule_id`)        REFERENCES `maintenance_schedules` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_rev_performer` FOREIGN KEY (`performed_by`)       REFERENCES `users` (`id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
@@ -335,12 +319,11 @@ CREATE TABLE IF NOT EXISTS `maintenance_reviews` (
 -- ustawienia systemowe
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `settings` (
-    `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `skey`       VARCHAR(100) NOT NULL,
-    `svalue`     TEXT         NULL,
-    `label`      VARCHAR(200) NOT NULL,
-    `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `id`         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    `skey`       VARCHAR(100)  NOT NULL,
+    `svalue`     TEXT          NULL,
+    `label`      VARCHAR(200)  NULL,
+    `updated_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_settings_key` (`skey`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;

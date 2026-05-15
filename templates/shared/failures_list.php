@@ -1,21 +1,13 @@
 <?php
 // templates/shared/failures_list.php
-// ZMIANA: kolumna "Objaw / Usterka" sprawdza other_symptom
+// ZMIANA 1: $pager['page'] → $pager['current_page'] (fix Warning)
+// ZMIANA 2: usunięto <div class="sh-title">📋 Zgłoszenia awarii</div>
 
 use App\Helpers\Helpers;
 
 $pageTitle = 'Zgłoszenia awarii';
 require BASE_PATH . '/templates/shared/header.php';
 ?>
-
-<div class="sh mb2">
-  <div class="sh-title">📋 Zgłoszenia awarii</div>
-  <div style="display:flex;gap:8px;">
-    <?php if (\App\Helpers\Auth::isMechanic()): ?>
-      <a href="<?= BASE_URL ?>/index.php?route=report" class="btn btn-p btn-sm">+ Nowe zgłoszenie</a>
-    <?php endif; ?>
-  </div>
-</div>
 
 <!-- Filtry -->
 <div class="card mb2">
@@ -89,7 +81,6 @@ require BASE_PATH . '/templates/shared/header.php';
           <td class="fs-sm"><?= Helpers::e($f['subsystem_name'] ?? '—') ?></td>
           <td><?= $f['category_id'] ? Helpers::catBadge($f['cat_label'], $f['cat_color']) : '<span class="muted fs-sm">—</span>' ?></td>
 
-          <?php /* ZMIANA: obsługa other_symptom w kolumnie Objaw / Usterka */ ?>
           <td class="fs-sm fw6">
             <?php if (!empty($f['other_symptom'])): ?>
               <?php
@@ -128,15 +119,26 @@ require BASE_PATH . '/templates/shared/header.php';
     </table>
   </div>
 
+  <?php /* ZMIANA 1: $pager['page'] → $pager['current_page'] (fix Undefined array key) */ ?>
   <?php if (!empty($pager) && $pager['total_pages'] > 1): ?>
   <div class="card-body" style="padding:10px 16px;border-top:1px solid #f3f4f6;">
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-      <?php if ($pager['page'] > 1): ?>
-        <a href="?route=failures&page=<?= $pager['page'] - 1 ?>&<?= http_build_query(array_filter(['status_id' => $_GET['status_id'] ?? '', 'line_id' => $_GET['line_id'] ?? '', 'category_id' => $_GET['category_id'] ?? '', 'search' => $_GET['search'] ?? ''])) ?>" class="btn btn-sm">← Poprzednia</a>
+      <?php if ($pager['current_page'] > 1): ?>
+        <a href="?route=failures&page=<?= $pager['current_page'] - 1 ?>&<?= http_build_query(array_filter([
+          'status_id'   => $_GET['status_id']   ?? '',
+          'line_id'     => $_GET['line_id']     ?? '',
+          'category_id' => $_GET['category_id'] ?? '',
+          'search'      => $_GET['search']      ?? '',
+        ])) ?>" class="btn btn-sm">← Poprzednia</a>
       <?php endif; ?>
-      <span class="muted fs-sm">Strona <?= $pager['page'] ?> / <?= $pager['total_pages'] ?></span>
-      <?php if ($pager['page'] < $pager['total_pages']): ?>
-        <a href="?route=failures&page=<?= $pager['page'] + 1 ?>&<?= http_build_query(array_filter(['status_id' => $_GET['status_id'] ?? '', 'line_id' => $_GET['line_id'] ?? '', 'category_id' => $_GET['category_id'] ?? '', 'search' => $_GET['search'] ?? ''])) ?>" class="btn btn-sm">Następna →</a>
+      <span class="muted fs-sm">Strona <?= $pager['current_page'] ?> / <?= $pager['total_pages'] ?></span>
+      <?php if ($pager['current_page'] < $pager['total_pages']): ?>
+        <a href="?route=failures&page=<?= $pager['current_page'] + 1 ?>&<?= http_build_query(array_filter([
+          'status_id'   => $_GET['status_id']   ?? '',
+          'line_id'     => $_GET['line_id']     ?? '',
+          'category_id' => $_GET['category_id'] ?? '',
+          'search'      => $_GET['search']      ?? '',
+        ])) ?>" class="btn btn-sm">Następna →</a>
       <?php endif; ?>
     </div>
   </div>

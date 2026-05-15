@@ -299,18 +299,18 @@ class FailureController
         // ZMIANA 3: ilość awarii w bieżącym miesiącu + polska nazwa miesiąca
         $monthlyCount = $fm->getMonthlyFailureCount();
         $polishMonths = [
-            1  => 'Styczeń',
-            2  => 'Luty',
-            3  => 'Marzec',
-            4  => 'Kwiecień',
-            5  => 'Maj',
-            6  => 'Czerwiec',
-            7  => 'Lipiec',
-            8  => 'Sierpień',
-            9  => 'Wrzesień',
-            10 => 'Październik',
-            11 => 'Listopad',
-            12 => 'Grudzień',
+            1  => 'Styczniu',
+            2  => 'Lutym',
+            3  => 'Marcu',
+            4  => 'Kwietniu',
+            5  => 'Maju',
+            6  => 'Czerwcu',
+            7  => 'Lipcu',
+            8  => 'Sierpniu',
+            9  => 'Wrześniu',
+            10 => 'Październiku',
+            11 => 'Listopadzie',
+            12 => 'Grudniu',
         ];
         $currentMonthName = $polishMonths[(int)date('n')];
 
@@ -360,16 +360,24 @@ class FailureController
     public function detail(): void
     {
         Auth::requireLogin();
-        if (!Auth::isMechanic() && !Auth::hasPermission('failures')) {
-            Helpers::flash('error', 'Brak uprawnień do szczegółów zgłoszenia.');
-            Helpers::redirect('dashboard');
-            return;
-        }
+
         $id      = (int)($_GET['id'] ?? 0);
         $fm      = new FailureModel();
         $failure = $fm->getById($id);
+
         if (!$failure) {
             require BASE_PATH . '/templates/shared/404.php';
+            return;
+        }
+
+        $user       = Auth::user();
+        $canEdit    = Auth::isMechanic() || Auth::hasPermission('failures');
+        $isReporter = (int)($failure['reporter_user_id'] ?? 0) === (int)$user['id'];
+
+        // Dostęp: mechanik / uprawniony ALBO zgłaszający tej awarii
+        if (!$canEdit && !$isReporter) {
+            Helpers::flash('error', 'Brak uprawnień do szczegółów zgłoszenia.');
+            Helpers::redirect('dashboard');
             return;
         }
 
@@ -379,6 +387,7 @@ class FailureController
         $categories = (new CategoryModel())->getAll(true);
         $dictionary = (new DictionaryModel())->getActive();
 
+        // $canEdit przekazywany do szablonu — ukrywa formularze dla obserwatora
         require BASE_PATH . '/templates/shared/failure_detail.php';
     }
 
