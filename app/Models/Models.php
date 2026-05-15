@@ -713,15 +713,32 @@ class FailureModel extends BaseModel
     }
 
     /** Historia linii do widoku publicznego i historii linii */
-    public function getLineHistory(int $lineId, int $days = 30): array
+    public function getLineHistory(int $lineId, int $days = 30, int $limit = 9999, int $offset = 0): array
     {
         return $this->fetchAll(
             $this->baseSelect() . "
              WHERE f.production_line_id = ?
                AND f.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-             ORDER BY f.created_at DESC",
+             ORDER BY f.created_at DESC
+             LIMIT $limit OFFSET $offset",
             [$lineId, $days]
         );
+    }
+
+    /**
+     * Zlicza zgłoszenia dla linii w danym przedziale czasowym.
+     * Używane do paginacji na stronie Historia linii.
+     */
+    public function countLineHistory(int $lineId, int $days = 30): int
+    {
+        $st = $this->db->prepare(
+            "SELECT COUNT(*)
+             FROM failures f
+             WHERE f.production_line_id = ?
+               AND f.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)"
+        );
+        $st->execute([$lineId, $days]);
+        return (int) $st->fetchColumn();
     }
 
     /** Statystyki linii — POPRAWKA 9: zwraca dane do obliczenia śr. czasu naprawy */

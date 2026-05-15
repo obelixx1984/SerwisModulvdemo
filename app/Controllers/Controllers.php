@@ -238,6 +238,7 @@ class PublicController
         $lineId  = (int)($_GET['line_id'] ?? 0);
         $rawDays = (int)($_GET['days'] ?? 30);
         $days    = in_array($rawDays, [7, 30, 90, 365]) ? $rawDays : 30;
+        $page    = max(1, (int)($_GET['page'] ?? 1));   // ← NOWE
 
         $fm          = new FailureModel();
         $mm          = new MaintenanceModel();
@@ -245,6 +246,7 @@ class PublicController
         $stats       = ['total' => 0, 'open_count' => 0, 'closed_count' => 0, 'avg_repair_str' => '—'];
         $durList     = [];
         $currentLine = null;
+        $pager       = null;   // ← NOWE
 
         if ($lineId > 0) {
             foreach ($lines as $l) {
@@ -253,7 +255,20 @@ class PublicController
                     break;
                 }
             }
-            $failures = $fm->getLineHistory($lineId, $days);
+
+            // ── NOWE: odczytaj records_per_page z bazy ustawień ──────────
+            $perPage = max(5, (int)(
+                (new \App\Models\SettingsModel())->get('records_per_page') ?? RECORDS_PER_PAGE
+            ));
+
+            // Policz całkowitą liczbę rekordów i wylicz paginację
+            $total    = $fm->countLineHistory($lineId, $days);   // ← nowa metoda w Models.php
+            $pager    = Helpers::paginate($total, $page, $perPage);
+
+            // Pobierz stronę wyników (LIMIT + OFFSET)
+            $failures = $fm->getLineHistory($lineId, $days, $pager['per_page'], $pager['offset']);
+            // ─────────────────────────────────────────────────────────────
+
             $rawStats = $fm->getLineStats($lineId, $days);
             if ($rawStats !== null) $stats = $rawStats;
             $durList  = $mm->getReviewsByLine($lineId, 5);

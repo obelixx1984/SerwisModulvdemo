@@ -1,4 +1,7 @@
 <?php
+// templates/admin/settings.php
+// ZMIANA: label "Rekordów na stronę" → "Ilość rekordów na stronie z historią linii" + opis
+
 use App\Helpers\Helpers;
 $pageTitle = 'Ustawienia systemu';
 require BASE_PATH . '/templates/shared/header.php';
@@ -38,10 +41,16 @@ require BASE_PATH . '/templates/shared/header.php';
         <input class="fc" name="company_name" value="<?= Helpers::e($settings['company_name']['svalue'] ?? '') ?>">
       </div>
 
+      <?php /* ZMIANA: nowy label i hint dla records_per_page */ ?>
       <div class="fg">
-        <label class="flbl">Rekordów na stronę</label>
+        <label class="flbl">Ilość rekordów na stronie z historią linii</label>
         <input class="fc" type="number" name="records_per_page" min="5" max="200" style="width:100px;"
                value="<?= Helpers::e($settings['records_per_page']['svalue'] ?? '25') ?>">
+        <span class="fhint">
+          Maksymalna liczba zgłoszeń widocznych na jednej stronie w historii linii
+          (<a href="<?= BASE_URL ?>/index.php?route=line_history" style="color:#0a2463;">Historia linii</a>).
+          Po przekroczeniu tej liczby pojawi się paginacja. Zakres: 5–200.
+        </span>
       </div>
 
       <div class="fg">
