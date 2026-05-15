@@ -369,6 +369,12 @@ class FailureController
             Helpers::redirect('failures');
         }
 
+        // Blokada: zgłoszenie zamknięte — nie można edytować kategorii
+        if (!empty($failure['status_is_final'])) {
+            Helpers::flash('error', 'Zgłoszenie jest zamknięte — nie można edytować kategorii i usterki.');
+            Helpers::redirect('failure_detail', ['id' => $id]);
+        }
+
         // Walidacja: jeśli Inna usterka, notatka obowiązkowa
         if ($otherFailure && !$mechanicNote) {
             Helpers::flash('error', 'Przy "Inna usterka" musisz wpisać notatkę mechanika.');
