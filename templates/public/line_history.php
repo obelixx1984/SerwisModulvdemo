@@ -49,7 +49,7 @@ require BASE_PATH . '/templates/shared/header.php';
         <thead><tr>
           <th>Numer</th><th>Data</th>
           <?php if (!empty($currentLine['subsystems_str'])): ?><th>Podzespół</th><?php endif; ?>
-          <th>Usterka</th><th>Status</th>
+          <th>Objaw / Usterka</th><th>Status</th>
         </tr></thead>
         <tbody>
         <?php foreach ($failures as $f): ?>
@@ -63,7 +63,8 @@ require BASE_PATH . '/templates/shared/header.php';
           <?php if (!empty($currentLine['subsystems_str'])): ?>
           <td class="fs-sm"><?= Helpers::e($f['subsystem_name']??'—') ?></td>
           <?php endif; ?>
-          <td class="fs-sm"><?= Helpers::e($f['dict_title']??'—') ?></td>
+          <?php /* Zmiana 1: symptom_name jako fallback */ ?>
+          <td class="fs-sm"><?= Helpers::e($f['symptom_name'] ?? $f['dict_title'] ?? mb_substr($f['description'] ?? '', 0, 40) ?: '—') ?></td>
           <td><?= Helpers::statusBadge($f['status_label'], $f['status_color']) ?></td>
         </tr>
         <?php endforeach; ?>

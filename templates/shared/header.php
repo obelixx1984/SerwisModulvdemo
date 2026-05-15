@@ -89,11 +89,13 @@ if ($user) {
   }
 }
 
+// Zmiana 1: dodano 'admin_symptoms' — aktywuje link "Administrator" w sidebarze
 $adminRoutes = [
   'admin_users',
   'admin_lines',
   'admin_statuses',
   'admin_dictionary',
+  'admin_symptoms',
   'admin_dur_tmpl',
   'admin_dur_sched',
   'admin_settings'
@@ -805,6 +807,24 @@ $adminRoutes = [
       pointer-events: none;
     }
 
+    /* Zmiana 3: Banner ostrzeżenia o brakującej kategorii/usterce przed statusem końcowym */
+    #catNotice {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 220px;
+      right: 0;
+      z-index: 1000;
+      background: #b91c1c;
+      color: #fff;
+      padding: 14px 24px;
+      font-size: 15px;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: .01em;
+      box-shadow: 0 3px 12px rgba(185, 28, 28, .4);
+    }
+
     /* ── Line history selector ── */
     .line-sel-bar {
       display: flex;
@@ -1068,7 +1088,8 @@ $adminRoutes = [
         grid-template-columns: 1fr;
       }
 
-      #durNotice {
+      #durNotice,
+      #catNotice {
         left: 0;
       }
     }
@@ -1094,7 +1115,8 @@ $adminRoutes = [
         padding: 14px;
       }
 
-      #durNotice {
+      #durNotice,
+      #catNotice {
         left: 52px;
       }
     }
@@ -1104,6 +1126,9 @@ $adminRoutes = [
 <body>
 
   <div id="durNotice">⚠&nbsp;&nbsp;Pamiętaj!!! Poinformuj dział DUR o zgłoszeniu.</div>
+
+  <!-- Zmiana 3: banner blokady statusu końcowego — pokazywany przez JS w failure_detail.php -->
+  <div id="catNotice">🚫&nbsp;&nbsp;Nie dodałeś kategorii i rodzaju awarii!!! Uzupełnij to!!!</div>
 
   <div class="app-shell">
     <nav class="sidebar">

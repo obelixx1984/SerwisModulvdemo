@@ -345,6 +345,54 @@ class DictionaryModel extends BaseModel
 }
 
 // ────────────────────────────────────────────────────────────
+// Zmiana 1: model objawów awarii — wybieranych przez zgłaszającego
+// ────────────────────────────────────────────────────────────
+class SymptomModel extends BaseModel
+{
+    public function getActive(): array
+    {
+        return $this->fetchAll(
+            "SELECT * FROM failure_symptoms WHERE is_active = 1 ORDER BY sort_order, name"
+        );
+    }
+
+    public function getAll(): array
+    {
+        return $this->fetchAll(
+            "SELECT * FROM failure_symptoms ORDER BY sort_order, name"
+        );
+    }
+
+    public function create(array $d): int
+    {
+        return $this->execute(
+            "INSERT INTO failure_symptoms (name, sort_order, is_active) VALUES (?, ?, ?)",
+            [trim($d['name']), (int)($d['sort_order'] ?? 0), 1]
+        );
+    }
+
+    public function update(int $id, array $d): void
+    {
+        $this->execute(
+            "UPDATE failure_symptoms SET name = ?, sort_order = ?, is_active = ? WHERE id = ?",
+            [trim($d['name']), (int)($d['sort_order'] ?? 0), (int)$d['is_active'], $id]
+        );
+    }
+
+    public function delete(int $id): void
+    {
+        $this->execute("DELETE FROM failure_symptoms WHERE id = ?", [$id]);
+    }
+
+    public function countUsages(int $id): int
+    {
+        $st = $this->db->prepare("SELECT COUNT(*) FROM failures WHERE symptom_id = ?");
+        $st->execute([$id]);
+        return (int) $st->fetchColumn();
+    }
+}
+
+// ────────────────────────────────────────────────────────────
 class StatusModel extends BaseModel
 {
     public function getAll(bool $activeOnly = false): array
@@ -408,6 +456,8 @@ class StatusModel extends BaseModel
 // ────────────────────────────────────────────────────────────
 class FailureModel extends BaseModel
 {
+    // Zmiana 1: LEFT JOIN failure_categories (category_id jest teraz NULL dla nowych zgłoszeń)
+    // Zmiana 1: LEFT JOIN failure_symptoms (nowa tabela objawów)
     private function baseSelect(): string
     {
         return "SELECT f.*,
@@ -415,13 +465,15 @@ class FailureModel extends BaseModel
             ls.name AS subsystem_name,
             fc.label AS cat_label, fc.color AS cat_color,
             fs.label AS status_label, fs.color AS status_color, fs.is_final AS status_is_final,
-            fd.title AS dict_title
+            fd.title AS dict_title,
+            fsym.name AS symptom_name
          FROM failures f
          JOIN production_lines pl ON pl.id = f.production_line_id
          LEFT JOIN line_subsystems ls ON ls.id = f.subsystem_id
-         JOIN failure_categories fc ON fc.id = f.category_id
+         LEFT JOIN failure_categories fc ON fc.id = f.category_id
          JOIN failure_statuses fs ON fs.id = f.status_id
-         LEFT JOIN failure_dictionary fd ON fd.id = f.dictionary_item_id";
+         LEFT JOIN failure_dictionary fd ON fd.id = f.dictionary_item_id
+         LEFT JOIN failure_symptoms fsym ON fsym.id = f.symptom_id";
     }
 
     public function getList(array $filters = [], int $limit = 25, int $offset = 0): array
@@ -441,8 +493,9 @@ class FailureModel extends BaseModel
             $params[] = $filters['category_id'];
         }
         if (!empty($filters['search'])) {
-            $where[] = '(f.ticket_number LIKE ? OR f.description LIKE ?)';
+            $where[] = '(f.ticket_number LIKE ? OR f.description LIKE ? OR fsym.name LIKE ?)';
             $s = '%' . $filters['search'] . '%';
+            $params[] = $s;
             $params[] = $s;
             $params[] = $s;
         }
@@ -470,13 +523,17 @@ class FailureModel extends BaseModel
             $params[] = $filters['category_id'];
         }
         if (!empty($filters['search'])) {
-            $where[] = '(f.ticket_number LIKE ? OR f.description LIKE ?)';
+            $where[] = '(f.ticket_number LIKE ? OR f.description LIKE ? OR fsym.name LIKE ?)';
             $s = '%' . $filters['search'] . '%';
             $params[] = $s;
             $params[] = $s;
+            $params[] = $s;
         }
+        // Zmiana 1: LEFT JOIN failure_symptoms potrzebny też w COUNT gdy filtrujemy po symptom_name
         $st = $this->db->prepare(
-            "SELECT COUNT(*) FROM failures f WHERE " . implode(' AND ', $where)
+            "SELECT COUNT(*) FROM failures f
+             LEFT JOIN failure_symptoms fsym ON fsym.id = f.symptom_id
+             WHERE " . implode(' AND ', $where)
         );
         $st->execute($params);
         return (int) $st->fetchColumn();
@@ -492,20 +549,23 @@ class FailureModel extends BaseModel
         return $this->fetchOne($this->baseSelect() . ' WHERE f.ticket_number = ?', [$ticket]);
     }
 
+    // Zmiana 1: symptom_id zamiast category_id + dictionary_item_id od zgłaszającego
+    // category_id i dictionary_item_id ustawia mechanik (Zmiana 2)
     public function create(array $d): int
     {
         return $this->execute(
             "INSERT INTO failures
-             (ticket_number, production_line_id, subsystem_id, category_id, status_id,
+             (ticket_number, production_line_id, subsystem_id, symptom_id, category_id, status_id,
               dictionary_item_id, reporter_acronym, reporter_name, description)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 $d['ticket_number'],
                 $d['production_line_id'],
                 $d['subsystem_id'] ?? null,
-                $d['category_id'],
+                $d['symptom_id'] ?? null,
+                null,    // category_id ustawia mechanik — Zmiana 1
                 $d['status_id'],
-                $d['dictionary_item_id'] ?? null,
+                null,    // dictionary_item_id ustawia mechanik — Zmiana 1
                 $d['reporter_acronym'] ?? null,
                 $d['reporter_name'] ?? null,
                 $d['description'] ?? null,
@@ -519,6 +579,24 @@ class FailureModel extends BaseModel
         $this->execute(
             "UPDATE failures SET status_id = ?, $closed updated_at = NOW() WHERE id = ?",
             [$newStatusId, $id]
+        );
+    }
+
+    // Zmiana 2: mechanik ustawia kategorie i usterkę
+    public function setCategory(int $id, array $d): void
+    {
+        $this->execute(
+            "UPDATE failures
+             SET category_id = ?, dictionary_item_id = ?, other_failure = ?, mechanic_note = ?,
+                 updated_at = NOW()
+             WHERE id = ?",
+            [
+                $d['category_id'] ?: null,
+                $d['dictionary_item_id'] ?: null,
+                $d['other_failure'] ? 1 : 0,
+                $d['mechanic_note'] ?: null,
+                $id
+            ]
         );
     }
 
@@ -608,12 +686,10 @@ class FailureModel extends BaseModel
             [$lineId, $days]
         );
 
-        // fetchOne może zwrócić null gdy brak danych — zwróć wartości domyślne
         if (!is_array($row)) {
             return $empty;
         }
 
-        // Formatuj avg_repair_minutes → string
         $row['avg_repair_str'] = '—';
         if (!empty($row['avg_repair_minutes'])) {
             $min = (float) $row['avg_repair_minutes'];
@@ -627,19 +703,18 @@ class FailureModel extends BaseModel
     /** Usuń zgłoszenie wraz z historią i komentarzami (kaskadowo przez FK) */
     public function deleteFailure(int $id): void
     {
-        // failure_comments i failure_history mają ON DELETE CASCADE — usuwają się automatycznie
         $this->execute("DELETE FROM failures WHERE id = ?", [$id]);
     }
 
-    /** Sprawdź czy istnieje otwarte zgłoszenie tej usterki na tej linii */
-    public function findOpenDuplicate(int $lineId, int $dictId): ?array
+    // Zmiana 1+5: sprawdza duplikat po symptom_id (nie dictionary_item_id)
+    public function findOpenDuplicate(int $lineId, int $symptomId): ?array
     {
         return $this->fetchOne(
             "SELECT f.ticket_number FROM failures f
              JOIN failure_statuses fs ON fs.id = f.status_id
-             WHERE f.production_line_id = ? AND f.dictionary_item_id = ? AND fs.is_final = 0
+             WHERE f.production_line_id = ? AND f.symptom_id = ? AND fs.is_final = 0
              LIMIT 1",
-            [$lineId, $dictId]
+            [$lineId, $symptomId]
         );
     }
 

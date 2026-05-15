@@ -38,12 +38,12 @@ foreach ($lines as $l) {
         <?php if ($duplicate): ?>
           <div class="dup-warn" style="display:block;">
             ⚠ <strong>Uwaga:</strong> Zgłoszenie <strong><?= Helpers::e($duplicate['ticket_number']) ?></strong>
-            z tą samą usterką jest już otwarte na tej linii!
+            z tym samym objawem jest już otwarte na tej linii!
           </div>
         <?php else: ?>
           <div class="dup-warn" id="dupWarn">
             ⚠ <strong>Uwaga:</strong> Zgłoszenie <strong id="dupTicket"></strong>
-            z tą samą usterką jest już otwarte na tej linii!
+            z tym samym objawem jest już otwarte na tej linii!
           </div>
         <?php endif; ?>
 
@@ -90,39 +90,27 @@ foreach ($lines as $l) {
             </select>
           </div>
 
+          <?php /* Zmiana 1: wybór objawu zamiast kategorii + słownika */ ?>
           <div class="fg">
-            <label class="flbl">Rodzaj awarii <span class="req">*</span></label>
-            <select name="category_id" id="pubCat" class="fc" required>
-              <option value="">— Wybierz rodzaj —</option>
+            <label class="flbl">Objaw awarii <span class="req">*</span></label>
+            <select name="symptom_id" id="pubSymptom" class="fc" required>
+              <option value="">— Wybierz objaw —</option>
               <?php
-              $selectedCat = $_POST['category_id'] ?? $_GET['cat_id'] ?? '';
+              $selectedSymptom = $_POST['symptom_id'] ?? $_GET['symptom_id'] ?? '';
               ?>
-              <?php foreach ($categories as $cat): ?>
-                <option value="<?= $cat['id'] ?>"
-                  <?= $selectedCat == $cat['id'] ? 'selected' : '' ?>>
-                  <?= Helpers::e($cat['label']) ?>
+              <?php foreach ($symptoms as $sym): ?>
+                <option value="<?= $sym['id'] ?>"
+                  <?= $selectedSymptom == $sym['id'] ? 'selected' : '' ?>>
+                  <?= Helpers::e($sym['name']) ?>
                 </option>
               <?php endforeach; ?>
             </select>
           </div>
 
           <div class="fg">
-            <label class="flbl">Usterka ze słownika</label>
-            <select name="dictionary_item_id" id="pubDict" class="fc">
-              <option value="">— Wybierz typową usterkę —</option>
-              <?php foreach ($dictionary as $d): ?>
-                <option value="<?= $d['id'] ?>" data-cat="<?= $d['category_id'] ?>"
-                  <?= ($_POST['dictionary_item_id'] ?? '') == $d['id'] ? 'selected' : '' ?>>
-                  <?= Helpers::e($d['title']) ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-
-          <div class="fg">
-            <label class="flbl">Własny opis usterki</label>
+            <label class="flbl">Dodatkowy opis (opcjonalnie)</label>
             <textarea name="description" class="fc" rows="3"
-              placeholder="Opisz dokładnie objawy awarii..."><?= Helpers::e($_POST['description'] ?? '') ?></textarea>
+              placeholder="Opisz dokładnie co zaobserwowałeś..."><?= Helpers::e($_POST['description'] ?? '') ?></textarea>
           </div>
 
           <button type="submit" class="pub-btn">🚨 Wyślij zgłoszenie awarii</button>
@@ -172,7 +160,7 @@ foreach ($lines as $l) {
                   <th>Numer</th>
                   <th>Data</th>
                   <?php if (!empty($currentLine['subsystems_str'])): ?><th>Podzespół</th><?php endif; ?>
-                  <th>Usterka</th>
+                  <th>Objaw / Usterka</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -184,7 +172,8 @@ foreach ($lines as $l) {
                     <?php if (!empty($currentLine['subsystems_str'])): ?>
                       <td class="fs-sm"><?= Helpers::e($f['subsystem_name'] ?? '—') ?></td>
                     <?php endif; ?>
-                    <td class="fs-sm"><?= Helpers::e($f['dict_title'] ?? mb_substr($f['description'] ?? '', 0, 40)) ?></td>
+                    <?php /* Zmiana 1: symptom_name jako fallback */ ?>
+                    <td class="fs-sm"><?= Helpers::e($f['symptom_name'] ?? $f['dict_title'] ?? mb_substr($f['description'] ?? '', 0, 40)) ?></td>
                     <td><?= Helpers::statusBadge($f['status_label'], $f['status_color']) ?></td>
                     </tr>
                   <?php endforeach; ?>
@@ -227,37 +216,35 @@ foreach ($lines as $l) {
 
 <script>
   window.SUBSYSTEMS = <?= json_encode($subsystemsJs, JSON_HEX_TAG) ?>;
+
+  // Zmiana linii → przeładuj stronę z zachowaniem wybranego objawu
   document.getElementById('pubLine').addEventListener('change', function() {
-    var lineId = this.value;
-    var reporter = document.querySelector('select[name="reporter_acronym"]') ?
-      document.querySelector('select[name="reporter_acronym"]').value : '';
-    var cat = document.getElementById('pubCat') ? document.getElementById('pubCat').value : '';
+    var lineId     = this.value;
+    var symptomSel = document.getElementById('pubSymptom');
+    var symptomVal = symptomSel ? symptomSel.value : '';
     var url = '<?= BASE_URL ?>/index.php?route=report';
-    if (lineId) url += '&line_id=' + encodeURIComponent(lineId);
-    if (reporter) url += '&reporter=' + encodeURIComponent(reporter);
-    if (cat) url += '&cat_id=' + encodeURIComponent(cat);
+    if (lineId)     url += '&line_id='   + encodeURIComponent(lineId);
+    if (symptomVal) url += '&symptom_id=' + encodeURIComponent(symptomVal);
     window.location.href = url;
   });
 
-  // Sprawdź duplikaty po wyborze usterki (błąd 4)
+  // Zmiana 1+5: sprawdź duplikaty po wyborze objawu (symptom_id zamiast dict_id)
   (function() {
-    var dictSel = document.getElementById('pubDict');
-    var lineSel = document.getElementById('pubLine');
-    if (!dictSel || !lineSel) return;
-    dictSel.addEventListener('change', function() {
-      var dictId = this.value;
-      var lineId = lineSel.value;
+    var symptomSel = document.getElementById('pubSymptom');
+    var lineSel    = document.getElementById('pubLine');
+    if (!symptomSel || !lineSel) return;
+    symptomSel.addEventListener('change', function() {
+      var symptomId = this.value;
+      var lineId    = lineSel.value;
       var dw = document.getElementById('dupWarn');
       var dt = document.getElementById('dupTicket');
       if (!dw || !dt) return;
-      if (!dictId || !lineId) {
+      if (!symptomId || !lineId) {
         dw.style.display = 'none';
         return;
       }
-      fetch('<?= BASE_URL ?>/index.php?route=check_duplicate&line_id=' + lineId + '&dict_id=' + dictId)
-        .then(function(r) {
-          return r.json();
-        })
+      fetch('<?= BASE_URL ?>/index.php?route=check_duplicate&line_id=' + lineId + '&symptom_id=' + symptomId)
+        .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data && data.ticket) {
             dt.textContent = data.ticket;

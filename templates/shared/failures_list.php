@@ -45,7 +45,7 @@ require BASE_PATH . '/templates/shared/header.php';
     </div>
     <div class="fg" style="margin:0;flex:2;min-width:140px;">
       <label class="flbl">Szukaj</label>
-      <input type="text" name="search" class="fc" placeholder="Numer lub opis..."
+      <input type="text" name="search" class="fc" placeholder="Numer, opis lub objaw..."
              value="<?= Helpers::e($_GET['search'] ?? '') ?>">
     </div>
     <button type="submit" class="btn btn-p btn-sm" style="margin-bottom:0;">Szukaj</button>
@@ -59,7 +59,7 @@ require BASE_PATH . '/templates/shared/header.php';
       <thead>
         <tr>
           <th>Numer</th><th>Data</th><th>Zgłaszający</th><th>Linia</th>
-          <th>Podzespół</th><th>Rodzaj</th><th>Usterka</th><th>Status</th><th></th>
+          <th>Podzespół</th><th>Rodzaj</th><th>Objaw / Usterka</th><th>Status</th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -70,11 +70,13 @@ require BASE_PATH . '/templates/shared/header.php';
             <a href="<?= BASE_URL ?>/index.php?route=failure_detail&id=<?= $f['id'] ?>"><?= Helpers::e($f['ticket_number']) ?></a>
           </td>
           <td class="muted fs-sm"><?= Helpers::formatDate($f['created_at']) ?></td>
-          <td class="fs-sm"><?= Helpers::e($f['reporter_acronym'] ?? '—') ?></td>
+          <?php /* Zmiana 4: imię i nazwisko zamiast loginu */ ?>
+          <td class="fs-sm"><?= Helpers::e($f['reporter_name'] ?? $f['reporter_acronym'] ?? '—') ?></td>
           <td class="fs-sm"><?= Helpers::e($f['line_name']) ?></td>
           <td class="fs-sm"><?= Helpers::e($f['subsystem_name'] ?? '—') ?></td>
-          <td><?= Helpers::catBadge($f['cat_label'], $f['cat_color']) ?></td>
-          <td class="fs-sm fw6"><?= Helpers::e($f['dict_title'] ?? mb_substr($f['description'] ?? '', 0, 40)) ?></td>
+          <td><?= $f['category_id'] ? Helpers::catBadge($f['cat_label'], $f['cat_color']) : '<span class="muted fs-sm">—</span>' ?></td>
+          <?php /* Zmiana 1: symptom_name jako fallback do dict_title */ ?>
+          <td class="fs-sm fw6"><?= Helpers::e($f['symptom_name'] ?? $f['dict_title'] ?? mb_substr($f['description'] ?? '', 0, 40)) ?></td>
           <td><?= Helpers::statusBadge($f['status_label'], $f['status_color']) ?></td>
           <td style="display:flex;gap:4px;align-items:center;">
             <a href="<?= BASE_URL ?>/index.php?route=failure_detail&id=<?= $f['id'] ?>" class="btn btn-sm">Szczegóły</a>

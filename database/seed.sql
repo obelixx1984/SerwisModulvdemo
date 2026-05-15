@@ -96,6 +96,21 @@ INSERT INTO `failure_statuses` (`id`, `label`, `color`, `sort_order`, `is_initia
 (6, 'Zamknięta',          '#374151', 6, 0, 1, 1);
 
 -- ────────────────────────────────────────────────────────────
+-- Zmiana 1: Objawy awarii — wybierane przez zgłaszającego
+-- ────────────────────────────────────────────────────────────
+INSERT INTO `failure_symptoms` (`name`, `sort_order`, `is_active`) VALUES
+('Maszyna nie reaguje',              1, 1),
+('Spadki napięcia',                  2, 1),
+('Brak komunikacji',                 3, 1),
+('Zatrzymanie linii',                4, 1),
+('Nietypowy dźwięk / wibracje',      5, 1),
+('Wyciek płynu',                     6, 1),
+('Błąd na panelu operatorskim',      7, 1),
+('Przegrzewanie się urządzenia',     8, 1),
+('Brak ruchu / zacięcie',            9, 1),
+('Inne objawy',                     10, 1);
+
+-- ────────────────────────────────────────────────────────────
 -- Szablony DUR
 -- ────────────────────────────────────────────────────────────
 INSERT INTO `maintenance_templates` (`id`, `name`, `review_type`, `checklist`, `created_by`) VALUES

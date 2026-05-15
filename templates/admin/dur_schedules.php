@@ -9,6 +9,7 @@ require BASE_PATH . '/templates/shared/header.php';
   <a href="<?= BASE_URL ?>/index.php?route=admin_lines"      class="atab">Linie i podzespoły</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_statuses"   class="atab">Statusy</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_dictionary" class="atab">Słownik awarii</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_symptoms"   class="atab">Objawy awarii</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_dur_tmpl"   class="atab v">Szablony DUR</a>
   <button class="atab v active">Harmonogram DUR</button>
   <a href="<?= BASE_URL ?>/index.php?route=admin_settings"   class="atab">Ustawienia</a>

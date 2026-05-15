@@ -14,7 +14,8 @@ use App\Models\{
     StatusModel,
     FailureModel,
     MaintenanceModel,
-    SettingsModel
+    SettingsModel,
+    SymptomModel
 };
 
 // ────────────────────────────────────────────────────────────
@@ -60,14 +61,13 @@ class AuthController
 // ────────────────────────────────────────────────────────────
 class PublicController
 {
-    /** Formularz zgłoszenia awarii */
+    // Zmiana 1: załaduj objawy zamiast kategorii i słownika
     public function reportForm(): void
     {
         Auth::requireLogin();
 
-        $lines      = (new ProductionLineModel())->getAll(true);
-        $categories = (new CategoryModel())->getAll(true);
-        $dictionary = (new DictionaryModel())->getActive();
+        $lines    = (new ProductionLineModel())->getAll(true);
+        $symptoms = (new SymptomModel())->getActive();
 
         $selectedLineId = (int)($_GET['line_id'] ?? 0);
         $lineHistory    = [];
@@ -89,8 +89,9 @@ class PublicController
             $lineStats   = $fm->getLineStats($selectedLineId, 30);
             $lineDur     = $mm->getReviewsByLine($selectedLineId, 3);
 
-            if (!empty($_GET['dict_id'])) {
-                $duplicate = $fm->findOpenDuplicate($selectedLineId, (int)$_GET['dict_id']);
+            // Zmiana 1+5: sprawdź duplikat po symptom_id
+            if (!empty($_GET['symptom_id'])) {
+                $duplicate = $fm->findOpenDuplicate($selectedLineId, (int)$_GET['symptom_id']);
             }
         }
 
@@ -108,19 +109,16 @@ class PublicController
 
         $lineId      = (int)($_POST['production_line_id'] ?? 0);
         $subsysId    = !empty($_POST['subsystem_id']) ? (int)$_POST['subsystem_id'] : null;
-        $categoryId  = (int)($_POST['category_id'] ?? 0);
-        $dictItemId  = !empty($_POST['dictionary_item_id']) ? (int)$_POST['dictionary_item_id'] : null;
+        // Zmiana 1: symptom_id zamiast category_id + dictionary_item_id
+        $symptomId   = !empty($_POST['symptom_id']) ? (int)$_POST['symptom_id'] : null;
         $description = trim($_POST['description'] ?? '');
         $currentUser  = Auth::user();
         $reporterName = $currentUser['name'];
         $reporterLogin = $currentUser['login'];
 
         $errors = [];
-        if (!$lineId)     $errors[] = 'Wybierz linię produkcyjną.';
-        if (!$categoryId) $errors[] = 'Wybierz rodzaj awarii.';
-        if (!$dictItemId && !$description) {
-            $errors[] = 'Wybierz usterkę ze słownika lub wpisz opis własny.';
-        }
+        if (!$lineId)    $errors[] = 'Wybierz linię produkcyjną.';
+        if (!$symptomId) $errors[] = 'Wybierz objaw awarii.';
 
         if ($errors) {
             Helpers::flash('error', implode(' ', $errors));
@@ -141,11 +139,6 @@ class PublicController
             Helpers::redirect('report');
         }
 
-        // Pobierz pełną nazwę pracownika
-        $currentUser   = Auth::user();
-        $reporterName  = $currentUser['name'];
-        $reporterLogin = $currentUser['login'];
-
         // POPRAWKA 1: Generuj numer w formacie 0001/PREFIX/ROK
         $ticket = Helpers::generateTicketNumber($lineId, $line['prefix']);
 
@@ -154,9 +147,8 @@ class PublicController
             'ticket_number'      => $ticket,
             'production_line_id' => $lineId,
             'subsystem_id'       => $subsysId,
-            'category_id'        => $categoryId,
+            'symptom_id'         => $symptomId,
             'status_id'          => $initStatus['id'],
-            'dictionary_item_id' => $dictItemId,
             'reporter_acronym'   => $reporterLogin,
             'reporter_name'      => $reporterName,
             'description'        => $description ?: null,
@@ -264,6 +256,7 @@ class FailureController
         require BASE_PATH . '/templates/shared/failures_list.php';
     }
 
+    // Zmiana 2: załaduj kategorie i słownik dla sekcji mechanika
     public function detail(): void
     {
         Auth::requireMechanic();
@@ -275,13 +268,16 @@ class FailureController
             return;
         }
 
-        $history  = $fm->getHistory($id);
-        $comments = $fm->getComments($id);
-        $statuses = (new StatusModel())->getAll(true);
+        $history    = $fm->getHistory($id);
+        $comments   = $fm->getComments($id);
+        $statuses   = (new StatusModel())->getAll(true);
+        $categories = (new CategoryModel())->getAll(true);
+        $dictionary = (new DictionaryModel())->getActive();
 
         require BASE_PATH . '/templates/shared/failure_detail.php';
     }
 
+    // Zmiana 3: blokada statusu końcowego bez kategorii i usterki
     public function changeStatus(): void
     {
         Auth::requireMechanic();
@@ -323,6 +319,19 @@ class FailureController
             Helpers::redirect('failure_detail', ['id' => $id]);
         }
 
+        // Zmiana 3: blokada statusu końcowego bez kategorii i usterki
+        if (!empty($newStatus['is_final'])) {
+            $hasCategory = !empty($failure['category_id']);
+            $hasDict     = !empty($failure['dictionary_item_id']);
+            $hasOther    = !empty($failure['other_failure']);
+            $hasNote     = !empty($failure['mechanic_note']);
+
+            if (!$hasCategory || (!$hasDict && !$hasOther) || ($hasOther && !$hasNote)) {
+                Helpers::flash('error', 'Nie dodałeś kategorii i rodzaju awarii!!! Uzupełnij to!!!');
+                Helpers::redirect('failure_detail', ['id' => $id]);
+            }
+        }
+
         $user = Auth::user();
         $fm->changeStatus($id, $newStatusId, (bool)$newStatus['is_final']);
         $fm->addHistory(
@@ -336,6 +345,56 @@ class FailureController
         );
 
         Helpers::flash('success', 'Status zmieniony na: <strong>' . Helpers::e($newStatus['label']) . '</strong>');
+        Helpers::redirect('failure_detail', ['id' => $id]);
+    }
+
+    // Zmiana 2: mechanik ustawia kategorię i usterkę
+    public function setCategory(): void
+    {
+        Auth::requireMechanic();
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('failures');
+        }
+        $id           = (int)($_POST['failure_id'] ?? 0);
+        $categoryId   = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
+        $dictItemId   = !empty($_POST['dictionary_item_id']) ? (int)$_POST['dictionary_item_id'] : null;
+        $otherFailure = !empty($_POST['other_failure']) ? 1 : 0;
+        $mechanicNote = trim($_POST['mechanic_note'] ?? '');
+
+        $fm      = new FailureModel();
+        $failure = $fm->getById($id);
+        if (!$failure) {
+            Helpers::redirect('failures');
+        }
+
+        // Walidacja: jeśli Inna usterka, notatka obowiązkowa
+        if ($otherFailure && !$mechanicNote) {
+            Helpers::flash('error', 'Przy "Inna usterka" musisz wpisać notatkę mechanika.');
+            Helpers::redirect('failure_detail', ['id' => $id]);
+        }
+
+        // Gdy Inna usterka — wyczyść pozycję słownika (są wzajemnie wykluczające się)
+        if ($otherFailure) {
+            $dictItemId = null;
+        }
+
+        $user = Auth::user();
+        $fm->setCategory($id, [
+            'category_id'        => $categoryId,
+            'dictionary_item_id' => $dictItemId,
+            'other_failure'      => $otherFailure,
+            'mechanic_note'      => $mechanicNote,
+        ]);
+        $fm->addHistory(
+            $id,
+            $user['id'],
+            'edited',
+            null, null,
+            $user['name'],
+            'Ustawiono kategorię i usterkę przez mechanika'
+        );
+        Helpers::flash('success', 'Kategoria i usterka zapisane.');
         Helpers::redirect('failure_detail', ['id' => $id]);
     }
 
@@ -807,6 +866,71 @@ class AdminController
         Helpers::redirect('admin_dictionary');
     }
 
+    // Zmiana 1: zarządzanie objawami awarii
+    public function symptoms(): void
+    {
+        Auth::requireAdmin();
+        $db = \App\Helpers\Database::get();
+        $st = $db->query(
+            "SELECT s.*, COUNT(f.id) AS usage_count
+             FROM failure_symptoms s
+             LEFT JOIN failures f ON f.symptom_id = s.id
+             GROUP BY s.id
+             ORDER BY s.sort_order, s.name"
+        );
+        $symptoms = $st->fetchAll();
+        require BASE_PATH . '/templates/admin/symptoms.php';
+    }
+
+    public function symptomSave(): void
+    {
+        Auth::requireAdmin();
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('admin_symptoms');
+        }
+        $id     = (int)($_POST['symptom_id'] ?? 0);
+        $name   = trim($_POST['name'] ?? '');
+        $order  = (int)($_POST['sort_order'] ?? 0);
+        $active = (int)($_POST['is_active'] ?? 1);
+
+        if (!$name) {
+            Helpers::flash('error', 'Podaj nazwę objawu.');
+            Helpers::redirect('admin_symptoms');
+        }
+
+        $sm = new SymptomModel();
+        if ($id > 0) {
+            $sm->update($id, ['name' => $name, 'sort_order' => $order, 'is_active' => $active]);
+            Helpers::flash('success', 'Objaw "' . Helpers::e($name) . '" zaktualizowany.');
+        } else {
+            $sm->create(['name' => $name, 'sort_order' => $order]);
+            Helpers::flash('success', 'Objaw "' . Helpers::e($name) . '" dodany.');
+        }
+        Helpers::redirect('admin_symptoms');
+    }
+
+    public function symptomDelete(): void
+    {
+        Auth::requireAdmin();
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('admin_symptoms');
+        }
+        $id = (int)($_POST['symptom_id'] ?? 0);
+        if ($id > 0) {
+            $sm    = new SymptomModel();
+            $usage = $sm->countUsages($id);
+            if ($usage > 0) {
+                Helpers::flash('error', 'Nie można usunąć objawu — jest używany w ' . $usage . ' zgłoszeniu/zgłoszeniach. Możesz go dezaktywować.');
+                Helpers::redirect('admin_symptoms');
+            }
+            $sm->delete($id);
+            Helpers::flash('success', 'Objaw usunięty.');
+        }
+        Helpers::redirect('admin_symptoms');
+    }
+
     public function durTemplates(): void
     {
         Auth::requireAdmin();
@@ -1039,16 +1163,17 @@ class AdminController
 // ── Endpoint AJAX: sprawdź duplikat usterki ───────────────────
 class AjaxController
 {
+    // Zmiana 1+5: sprawdza duplikat po symptom_id (nie dict_id)
     public function checkDuplicate(): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        $lineId = (int)($_GET['line_id'] ?? 0);
-        $dictId = (int)($_GET['dict_id'] ?? 0);
-        if (!$lineId || !$dictId) {
+        $lineId    = (int)($_GET['line_id'] ?? 0);
+        $symptomId = (int)($_GET['symptom_id'] ?? 0);
+        if (!$lineId || !$symptomId) {
             echo json_encode(['ticket' => null]);
             exit;
         }
-        $dup = (new \App\Models\FailureModel())->findOpenDuplicate($lineId, $dictId);
+        $dup = (new \App\Models\FailureModel())->findOpenDuplicate($lineId, $symptomId);
         echo json_encode(['ticket' => $dup ? $dup['ticket_number'] : null]);
         exit;
     }

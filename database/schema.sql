@@ -140,18 +140,38 @@ CREATE TABLE IF NOT EXISTS `failure_statuses` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
+-- Zmiana 1: objawy awarii — wybierane przez zgłaszającego
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `failure_symptoms` (
+    `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name`       VARCHAR(200) NOT NULL COMMENT 'Nazwa objawu widoczna dla zgłaszającego',
+    `sort_order` INT UNSIGNED NOT NULL DEFAULT 0,
+    `is_active`  TINYINT(1) NOT NULL DEFAULT 1,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_symptoms_active` (`is_active`),
+    KEY `idx_symptoms_order` (`sort_order`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- ────────────────────────────────────────────────────────────
 -- zgłoszenia awarii
 -- POPRAWKA 1: ticket_number w formacie 0001/PREFIX/ROK
 -- POPRAWKA 3: usunięto assigned_to (mechanik nie jest przypisywany)
+-- Zmiana 1: symptom_id (wybrany przez zgłaszającego), category_id teraz NULL
+-- Zmiana 2: other_failure + mechanic_note (ustawia mechanik)
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `failures` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `ticket_number` VARCHAR(30) NOT NULL COMMENT 'Format: 0001/PREFIX/ROK',
     `production_line_id` INT UNSIGNED NOT NULL,
     `subsystem_id` INT UNSIGNED NULL COMMENT 'Opcjonalny podzespół linii',
-    `category_id` INT UNSIGNED NOT NULL,
+    `symptom_id` INT UNSIGNED NULL COMMENT 'Zmiana 1: objaw wybrany przez zgłaszającego',
+    `category_id` INT UNSIGNED NULL COMMENT 'Zmiana 1: rodzaj awarii — ustawia mechanik (było NOT NULL)',
     `status_id` INT UNSIGNED NOT NULL,
     `dictionary_item_id` INT UNSIGNED NULL,
+    `other_failure` TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Zmiana 2: 1 = mechanik zaznaczył Inna usterka',
+    `mechanic_note` TEXT NULL COMMENT 'Zmiana 2: notatka mechanika przy Inna usterka',
     `reporter_acronym` VARCHAR(10) NULL COMMENT 'Akronim pracownika ze słownika',
     `reporter_name` VARCHAR(150) NULL COMMENT 'Pełna nazwa zgłaszającego',
     `description` TEXT NULL,
@@ -162,13 +182,15 @@ CREATE TABLE IF NOT EXISTS `failures` (
     UNIQUE KEY `uq_ticket` (`ticket_number`),
     KEY `idx_failures_line` (`production_line_id`),
     KEY `idx_failures_subsystem` (`subsystem_id`),
+    KEY `idx_failures_symptom` (`symptom_id`),
     KEY `idx_failures_category` (`category_id`),
     KEY `idx_failures_status` (`status_id`),
     KEY `idx_failures_created` (`created_at`),
     KEY `idx_failures_closed` (`closed_at`),
     CONSTRAINT `fk_failures_line` FOREIGN KEY (`production_line_id`) REFERENCES `production_lines` (`id`),
     CONSTRAINT `fk_failures_subsystem` FOREIGN KEY (`subsystem_id`) REFERENCES `line_subsystems` (`id`) ON DELETE SET NULL,
-    CONSTRAINT `fk_failures_category` FOREIGN KEY (`category_id`) REFERENCES `failure_categories` (`id`),
+    CONSTRAINT `fk_failures_symptom` FOREIGN KEY (`symptom_id`) REFERENCES `failure_symptoms` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_failures_category` FOREIGN KEY (`category_id`) REFERENCES `failure_categories` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_failures_status` FOREIGN KEY (`status_id`) REFERENCES `failure_statuses` (`id`),
     CONSTRAINT `fk_failures_dict` FOREIGN KEY (`dictionary_item_id`) REFERENCES `failure_dictionary` (`id`) ON DELETE SET NULL
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
@@ -320,3 +342,25 @@ CREATE TABLE IF NOT EXISTS `settings` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- ────────────────────────────────────────────────────────────
+-- MIGRACJA — tylko dla istniejących baz danych (pomiń przy nowej instalacji)
+-- Wykonaj poniższe ALTER jeśli baza już istnieje i ma tabelę failures
+-- ────────────────────────────────────────────────────────────
+-- ALTER TABLE `failures`
+--     ADD COLUMN IF NOT EXISTS `symptom_id`    INT UNSIGNED NULL COMMENT 'Objaw wybrany przez zgłaszającego' AFTER `subsystem_id`,
+--     ADD COLUMN IF NOT EXISTS `other_failure` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = mechanik zaznaczył Inna usterka' AFTER `dictionary_item_id`,
+--     ADD COLUMN IF NOT EXISTS `mechanic_note` TEXT NULL COMMENT 'Notatka mechanika przy Inna usterka' AFTER `other_failure`,
+--     MODIFY COLUMN `category_id` INT UNSIGNED NULL COMMENT 'Rodzaj awarii — ustawia mechanik';
+--
+-- ALTER TABLE `failures`
+--     ADD KEY IF NOT EXISTS `idx_failures_symptom` (`symptom_id`);
+--
+-- ALTER TABLE `failures`
+--     ADD CONSTRAINT `fk_failures_symptom`
+--     FOREIGN KEY (`symptom_id`) REFERENCES `failure_symptoms` (`id`) ON DELETE SET NULL;
+--
+-- Zmiana FK category_id z NOT NULL na SET NULL (MySQL nie pozwala MODIFY FK bezpośrednio):
+-- ALTER TABLE `failures` DROP FOREIGN KEY `fk_failures_category`;
+-- ALTER TABLE `failures` ADD CONSTRAINT `fk_failures_category`
+--     FOREIGN KEY (`category_id`) REFERENCES `failure_categories` (`id`) ON DELETE SET NULL;
