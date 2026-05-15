@@ -156,7 +156,7 @@ $canEdit = $canEdit ?? \App\Helpers\Auth::isMechanic();
           </form>
         <?php else: ?>
           <div class="sep"></div>
-          <p class="muted fs-sm">Komentarze może dodawać tylko serwisant.</p>
+          <p class="muted fs-sm">Komentarze może dodawać tylko osoba z działu DUR.</p>
         <?php endif; ?>
       </div>
     </div>
@@ -172,7 +172,7 @@ $canEdit = $canEdit ?? \App\Helpers\Auth::isMechanic();
       <div class="card-body">
         <?php if ($history): ?>
           <ul class="tl">
-            <?php foreach ($history as $h):
+            <?php foreach (array_reverse($history) as $h):
               $dot = 'tl-dot';
               if ($h['action'] === 'created')        $dot .= ' g';
               if ($h['action'] === 'status_changed') $dot .= ' a';

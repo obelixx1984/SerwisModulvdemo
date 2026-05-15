@@ -172,7 +172,7 @@ require BASE_PATH . '/templates/shared/header.php';
         <div class="card">
           <div class="card-head">
             <span class="card-title">Przeglądy DUR</span>
-            <a href="<?= BASE_URL ?>/index.php?route=dur" class="btn btn-sm">Wszystkie</a>
+            <a href="<?= BASE_URL ?>/index.php?route=dur&line_id=<?= $lineId ?>" class="btn btn-sm">Wszystkie</a>
           </div>
           <div class="card-body" style="padding:8px;">
             <?php foreach ($durList as $r): ?>
