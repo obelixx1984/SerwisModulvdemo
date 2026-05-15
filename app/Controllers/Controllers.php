@@ -237,10 +237,11 @@ class FailureController
     public function list(): void
     {
         Auth::requireMechanic();
+        $catRaw   = $_GET['category_id'] ?? '';
         $filters  = [
             'status_id'   => (int)($_GET['status_id'] ?? 0) ?: null,
             'line_id'     => (int)($_GET['line_id'] ?? 0) ?: null,
-            'category_id' => (int)($_GET['category_id'] ?? 0) ?: null,
+            'category_id' => $catRaw === 'none' ? 'none' : ((int)$catRaw ?: null),
             'search'      => trim($_GET['search'] ?? ''),
         ];
         $page   = max(1, (int)($_GET['page'] ?? 1));

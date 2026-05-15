@@ -489,8 +489,12 @@ class FailureModel extends BaseModel
             $params[] = $filters['line_id'];
         }
         if (!empty($filters['category_id'])) {
-            $where[] = 'f.category_id = ?';
-            $params[] = $filters['category_id'];
+            if ($filters['category_id'] === 'none') {
+                $where[] = 'f.category_id IS NULL';
+            } else {
+                $where[] = 'f.category_id = ?';
+                $params[] = $filters['category_id'];
+            }
         }
         if (!empty($filters['search'])) {
             $where[] = '(f.ticket_number LIKE ? OR f.description LIKE ? OR fsym.name LIKE ?)';
@@ -519,8 +523,12 @@ class FailureModel extends BaseModel
             $params[] = $filters['line_id'];
         }
         if (!empty($filters['category_id'])) {
-            $where[] = 'f.category_id = ?';
-            $params[] = $filters['category_id'];
+            if ($filters['category_id'] === 'none') {
+                $where[] = 'f.category_id IS NULL';
+            } else {
+                $where[] = 'f.category_id = ?';
+                $params[] = $filters['category_id'];
+            }
         }
         if (!empty($filters['search'])) {
             $where[] = '(f.ticket_number LIKE ? OR f.description LIKE ? OR fsym.name LIKE ?)';

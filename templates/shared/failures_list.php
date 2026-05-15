@@ -36,6 +36,7 @@ require BASE_PATH . '/templates/shared/header.php';
       <label class="flbl">Rodzaj</label>
       <select name="category_id" class="fc">
         <option value="">Wszystkie</option>
+        <option value="none" <?= ($_GET['category_id'] ?? '') === 'none' ? 'selected' : '' ?>>— Bez kategorii —</option>
         <?php foreach ($categories as $cat): ?>
         <option value="<?= $cat['id'] ?>" <?= ($_GET['category_id'] ?? '') == $cat['id'] ? 'selected' : '' ?>>
           <?= Helpers::e($cat['label']) ?>
@@ -105,7 +106,7 @@ require BASE_PATH . '/templates/shared/header.php';
     $qbase = BASE_URL.'/index.php?route=failures'
       .(!empty($_GET['status_id'])   ? '&status_id='.(int)$_GET['status_id'] : '')
       .(!empty($_GET['line_id'])     ? '&line_id='.(int)$_GET['line_id'] : '')
-      .(!empty($_GET['category_id']) ? '&category_id='.(int)$_GET['category_id'] : '')
+      .(!empty($_GET['category_id']) ? '&category_id='.urlencode($_GET['category_id']) : '')
       .(!empty($_GET['search'])      ? '&search='.urlencode($_GET['search']) : '');
     ?>
     <?php if ($pager['has_prev']): ?>
