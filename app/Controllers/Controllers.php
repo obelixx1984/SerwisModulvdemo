@@ -95,6 +95,12 @@ class PublicController
             }
         }
 
+        // ZMIANA 1: pobierz nowo dodane zgłoszenie jeśli przekierowano po submit
+        $newFail = null;
+        if (!empty($_GET['new_fail_id'])) {
+            $newFail = (new FailureModel())->getById((int)$_GET['new_fail_id']);
+        }
+
         require BASE_PATH . '/templates/public/report_form.php';
     }
 
@@ -169,7 +175,8 @@ class PublicController
             'success_dur',
             'Zgłoszenie wysłane pomyślnie. Numer: <strong>' . Helpers::e($ticket) . '</strong>'
         );
-        Helpers::redirect('report');
+        // ZMIANA 1: redirect z line_id i new_fail_id — prawa kolumna zachowuje kontekst linii
+        Helpers::redirect('report', ['line_id' => $lineId, 'new_fail_id' => $failId]);
     }
 
     /** Historia linii — dostepna publicznie */
@@ -218,8 +225,26 @@ class FailureController
         $upcoming  = $mm->getUpcomingSchedules(DUR_WARNING_DAYS);
         $statuses  = (new StatusModel())->getAll(true);
 
-        // Średni czas naprawy dla wszystkich linii (błąd 1 pulpit)
+        // Średni czas naprawy dla wszystkich linii (zachowany do ewentualnego użycia)
         $avgRepairAll = $fm->getGlobalAvgRepairTime();
+
+        // ZMIANA 3: ilość awarii w bieżącym miesiącu + polska nazwa miesiąca
+        $monthlyCount = $fm->getMonthlyFailureCount();
+        $polishMonths = [
+            1  => 'Styczeń',
+            2  => 'Luty',
+            3  => 'Marzec',
+            4  => 'Kwiecień',
+            5  => 'Maj',
+            6  => 'Czerwiec',
+            7  => 'Lipiec',
+            8  => 'Sierpień',
+            9  => 'Wrzesień',
+            10 => 'Październik',
+            11 => 'Listopad',
+            12 => 'Grudzień',
+        ];
+        $currentMonthName = $polishMonths[(int)date('n')];
 
         // Zlicz per status
         $byStatus = [];
@@ -233,6 +258,7 @@ class FailureController
 
         require BASE_PATH . '/templates/shared/dashboard.php';
     }
+
 
     public function list(): void
     {
@@ -397,7 +423,8 @@ class FailureController
             $id,
             $user['id'],
             'edited',
-            null, null,
+            null,
+            null,
             $user['name'],
             'Ustawiono kategorię i usterkę przez mechanika'
         );

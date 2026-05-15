@@ -73,8 +73,8 @@ foreach ($lines as $l) {
           </div>
 
           <?php
-          $hasSubs = $currentLine && !empty($currentLine['subsystems_str']);
-          $subIds  = $hasSubs ? explode(',', $currentLine['subsystem_ids'] ?? '') : [];
+          $hasSubs  = $currentLine && !empty($currentLine['subsystems_str']);
+          $subIds   = $hasSubs ? explode(',', $currentLine['subsystem_ids'] ?? '') : [];
           $subNames = $hasSubs ? explode('|||', $currentLine['subsystems_str']) : [];
           ?>
           <div class="fg" id="subGrp" style="display:<?= $hasSubs ? 'block' : 'none' ?>;">
@@ -120,6 +120,40 @@ foreach ($lines as $l) {
   </div>
 
   <div>
+
+    <?php /* ZMIANA 1: karta potwierdzenia nowo dodanego zgłoszenia */ ?>
+    <?php if (!empty($newFail)): ?>
+    <div class="card mb2" style="border:2px solid #16a34a;background:#f0fdf4;">
+      <div class="card-head" style="background:#dcfce7;border-bottom:1px solid #bbf7d0;border-radius:10px 10px 0 0;">
+        <span class="card-title" style="color:#15803d;">✅ Zgłoszenie dodane pomyślnie</span>
+        <a href="<?= BASE_URL ?>/index.php?route=report&line_id=<?= (int)($currentLine['id'] ?? 0) ?>"
+           class="btn btn-sm" style="border-color:#16a34a;color:#16a34a;">✕ Zamknij</a>
+      </div>
+      <div class="card-body" style="padding:14px 16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span class="mono fw6" style="color:#0a2463;font-size:18px;">
+            <?= Helpers::e($newFail['ticket_number']) ?>
+          </span>
+          <?= Helpers::statusBadge($newFail['status_label'], $newFail['status_color']) ?>
+        </div>
+        <div class="fs-sm" style="color:#374151;line-height:1.9;">
+          <div><strong>Linia:</strong> <?= Helpers::e($newFail['line_name'] ?? '—') ?></div>
+          <?php if (!empty($newFail['symptom_name'])): ?>
+          <div><strong>Objaw:</strong> <?= Helpers::e($newFail['symptom_name']) ?></div>
+          <?php endif; ?>
+          <?php if (!empty($newFail['subsystem_name'])): ?>
+          <div><strong>Podzespół:</strong> <?= Helpers::e($newFail['subsystem_name']) ?></div>
+          <?php endif; ?>
+          <?php if (!empty($newFail['description'])): ?>
+          <div><strong>Opis:</strong> <?= Helpers::e(mb_substr($newFail['description'], 0, 80)) ?><?= mb_strlen($newFail['description']) > 80 ? '…' : '' ?></div>
+          <?php endif; ?>
+          <div><strong>Zgłaszający:</strong> <?= Helpers::e($newFail['reporter_name']) ?></div>
+          <div><strong>Data:</strong> <?= Helpers::formatDateOnly($newFail['created_at']) ?></div>
+        </div>
+      </div>
+    </div>
+    <?php endif; ?>
+
     <?php if (!$currentLine): ?>
       <div class="card" style="border:2px dashed #e5e7eb;">
         <div class="card-body" style="text-align:center;padding:40px 20px;">
@@ -175,8 +209,8 @@ foreach ($lines as $l) {
                     <?php /* Zmiana 1: symptom_name jako fallback */ ?>
                     <td class="fs-sm"><?= Helpers::e($f['symptom_name'] ?? $f['dict_title'] ?? mb_substr($f['description'] ?? '', 0, 40)) ?></td>
                     <td><?= Helpers::statusBadge($f['status_label'], $f['status_color']) ?></td>
-                    </tr>
-                  <?php endforeach; ?>
+                  </tr>
+                <?php endforeach; ?>
               </tbody>
             </table>
           </div>
@@ -200,8 +234,7 @@ foreach ($lines as $l) {
                 <div class="dur-meta"><?= Helpers::e($r['performer_name']) ?> · <?= (int)$r['duration_minutes'] ?> min</div>
                 <?php foreach (array_slice(explode("\n", $r['activities']), 0, 3) as $a): if (trim($a)): ?>
                     <div class="dur-item"><span class="ck">✓</span><span><?= Helpers::e(ltrim(trim($a), '-')) ?></span></div>
-                <?php endif;
-                endforeach; ?>
+                <?php endif; endforeach; ?>
                 <?php if ($r['next_review_date']): ?>
                   <div class="dur-next"><span style="color:#7c3aed;">▶</span> Następny: <strong><?= Helpers::e($r['next_review_date']) ?></strong></div>
                 <?php endif; ?>
@@ -223,7 +256,7 @@ foreach ($lines as $l) {
     var symptomSel = document.getElementById('pubSymptom');
     var symptomVal = symptomSel ? symptomSel.value : '';
     var url = '<?= BASE_URL ?>/index.php?route=report';
-    if (lineId)     url += '&line_id='   + encodeURIComponent(lineId);
+    if (lineId)     url += '&line_id='    + encodeURIComponent(lineId);
     if (symptomVal) url += '&symptom_id=' + encodeURIComponent(symptomVal);
     window.location.href = url;
   });

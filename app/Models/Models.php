@@ -726,6 +726,18 @@ class FailureModel extends BaseModel
         );
     }
 
+       /** ZMIANA 3: Zlicz awarie zgłoszone w bieżącym miesiącu i roku */
+    public function getMonthlyFailureCount(): int
+    {
+        $row = $this->fetchOne(
+            "SELECT COUNT(*) AS cnt
+             FROM failures
+             WHERE YEAR(created_at)  = YEAR(NOW())
+               AND MONTH(created_at) = MONTH(NOW())"
+        );
+        return (int)($row['cnt'] ?? 0);
+    }
+
     /** Globalny średni czas naprawy (wszystkie linie, zamknięte zgłoszenia) */
     public function getGlobalAvgRepairTime(): string
     {
