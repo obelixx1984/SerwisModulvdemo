@@ -48,7 +48,41 @@ class AuthController
         }
         Auth::login($user);
         $model->updateLastLogin($user['id']);
-        Helpers::redirect('dashboard');
+
+        // ── Wyznacz cel przekierowania na podstawie uprawnień ──
+        $role  = $user['role_name'];
+        $perms = [];
+
+        // Admin zawsze ma dashboard
+        if ($role === 'admin') {
+            Helpers::redirect('dashboard');
+            return;
+        }
+
+        // Wczytaj uprawnienia roli z bazy
+        try {
+            $pdo = \App\Helpers\Database::get();
+            $st  = $pdo->prepare("SELECT svalue FROM settings WHERE skey = ? LIMIT 1");
+            $st->execute(['role_perms_' . $role]);
+            $val = $st->fetchColumn();
+            if ($val) $perms = json_decode($val, true) ?? [];
+        } catch (\Throwable $e) {}
+
+        // Domyślne uprawnienia gdy brak w bazie
+        if (empty($perms)) {
+            if ($role === 'mechanic') {
+                $perms = ['dashboard' => 1, 'failures' => 1, 'dur' => 1, 'statuses' => 1];
+            } else {
+                $perms = ['report' => 1, 'dur' => 1];
+            }
+        }
+
+        // Przekieruj do pierwszej dostępnej sekcji (priorytet jak niżej)
+        if (!empty($perms['dashboard'])) { Helpers::redirect('dashboard');    return; }
+        if (!empty($perms['failures']))  { Helpers::redirect('failures');     return; }
+        if (!empty($perms['dur']))       { Helpers::redirect('dur');          return; }
+        if (!empty($perms['report']))    { Helpers::redirect('report');       return; }
+        Helpers::redirect('line_history'); // zawsze dostępna
     }
 
     public function logout(): void
@@ -121,6 +155,7 @@ class PublicController
         $currentUser  = Auth::user();
         $reporterName = $currentUser['name'];
         $reporterLogin = $currentUser['login'];
+        $reporterUserId = (int)$currentUser['id'];
 
         $errors = [];
         if (!$lineId)    $errors[] = 'Wybierz linię produkcyjną.';
@@ -156,6 +191,7 @@ class PublicController
             'symptom_id'         => $symptomId,
             'status_id'          => $initStatus['id'],
             'reporter_acronym'   => $reporterLogin,
+            'reporter_user_id'   => $reporterUserId,
             'reporter_name'      => $reporterName,
             'description'        => $description ?: null,
         ]);
@@ -522,20 +558,23 @@ class DurController
         $duration    = !empty($_POST['duration_minutes']) ? (int)$_POST['duration_minutes'] : null;
         $status      = in_array($_POST['status'] ?? '', ['completed', 'partial', 'interrupted'])
             ? $_POST['status'] : 'completed';
-        $nextDate    = $_POST['next_review_date'] ?? null;
+        $nextDate    = trim($_POST['next_review_date'] ?? '');
         $parts       = trim($_POST['parts_used'] ?? '');
         $notes       = trim($_POST['notes'] ?? '');
 
         if (!$lineId || !$activities || !$reviewDate) {
-            Helpers::flash('error', 'Uzupełnij wymagane pola.');
+            Helpers::flash('error', 'Wypełnij wymagane pola: linia, data, czynności.');
             Helpers::redirect('dur_add');
         }
 
         $user = Auth::user();
-        (new MaintenanceModel())->create([
+        $mm   = new MaintenanceModel();
+
+        $id = $mm->create([
             'production_line_id' => $lineId,
             'subsystem_id'       => $subsysId,
             'template_id'        => $templateId,
+            'schedule_id'        => null,
             'performed_by'       => $user['id'],
             'review_type'        => $reviewType,
             'review_date'        => $reviewDate,
@@ -547,8 +586,25 @@ class DurController
             'next_review_date'   => $nextDate ?: null,
         ]);
 
-        Helpers::flash('success', 'Raport DUR zapisany pomyślnie.');
-        Helpers::redirect('dur');
+        // ── ZMIANA 2: zaktualizuj next_due_date w harmonogramie ──
+        $schedule = $mm->findScheduleByLineAndType($lineId, $reviewType);
+        if ($schedule) {
+            if ($nextDate) {
+                // Użytkownik podał datę następnego przeglądu
+                $updatedNextDate = $nextDate;
+            } else {
+                // Oblicz na podstawie interval_days harmonogramu
+                $updatedNextDate = date(
+                    'Y-m-d',
+                    strtotime($reviewDate . ' + ' . (int)$schedule['interval_days'] . ' days')
+                );
+            }
+            $mm->updateScheduleNextDate($schedule['id'], $updatedNextDate);
+        }
+        // ─────────────────────────────────────────────────────────
+
+        Helpers::flash('success_dur', 'Raport DUR zapisany pomyślnie.');
+        Helpers::redirect('dur_detail', ['id' => $id]);
     }
 
     public function detail(): void
@@ -1210,5 +1266,81 @@ class AjaxController
         $dup = (new \App\Models\FailureModel())->findOpenDuplicate($lineId, $symptomId);
         echo json_encode(['ticket' => $dup ? $dup['ticket_number'] : null]);
         exit;
+    }
+}
+
+class UserController
+{
+    /**
+     * Zmiana hasła — obsługuje POST z modala w topbarze.
+     * Weryfikuje obecne hasło, sprawdza zgodność nowych, zapisuje hash.
+     */
+    public function changePassword(): void
+    {
+        Auth::requireLogin();
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            $this->redirectBack();
+        }
+
+        $currentPass = $_POST['current_password'] ?? '';
+        $newPass     = $_POST['new_password'] ?? '';
+        $confirmPass = $_POST['confirm_password'] ?? '';
+        $returnRoute = $_POST['return_route'] ?? 'dashboard';
+
+        if (!$currentPass || !$newPass || !$confirmPass) {
+            Helpers::flash('error', 'Wypełnij wszystkie pola formularza.');
+            Helpers::redirect($returnRoute);
+            return;
+        }
+        if (strlen($newPass) < 6) {
+            Helpers::flash('error', 'Nowe hasło musi mieć co najmniej 6 znaków.');
+            Helpers::redirect($returnRoute);
+            return;
+        }
+        if ($newPass !== $confirmPass) {
+            Helpers::flash('error', 'Nowe hasło i jego potwierdzenie nie są identyczne.');
+            Helpers::redirect($returnRoute);
+            return;
+        }
+
+        $user   = Auth::user();
+        $um     = new UserModel();
+        $dbUser = $um->findByNickname($user['login']);
+
+        if (!$dbUser || !password_verify($currentPass, $dbUser['password_hash'])) {
+            Helpers::flash('error', 'Obecne hasło jest nieprawidłowe.');
+            Helpers::redirect($returnRoute);
+            return;
+        }
+
+        $um->changePassword((int)$user['id'], $newPass);
+        Helpers::flash('success', 'Hasło zostało zmienione pomyślnie.');
+        Helpers::redirect($returnRoute);
+    }
+
+    /**
+     * Moje zgłoszenia — lista awarii zgłoszonych przez bieżącego użytkownika.
+     * Jeśli zgłoszenie ma status startowy (is_initial=1), użytkownik może je edytować.
+     */
+    public function myFailures(): void
+    {
+        Auth::requireLogin();
+        $user       = Auth::user();
+        $fm         = new FailureModel();
+        $statuses   = (new StatusModel())->getAll(true);
+
+        // Pobierz zgłoszenia tego użytkownika
+        $myFailures = $fm->getByReporterUserId((int)$user['id'], $user['name']);
+
+        $pageTitle  = 'Moje zgłoszenia';
+        require BASE_PATH . '/templates/shared/my_failures.php';
+    }
+
+    private function redirectBack(): void
+    {
+        $ref = $_SERVER['HTTP_REFERER'] ?? '';
+        if ($ref) { header('Location: ' . $ref); exit; }
+        Helpers::redirect('dashboard');
     }
 }

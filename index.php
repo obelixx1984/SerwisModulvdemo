@@ -32,7 +32,8 @@ spl_autoload_register(function (string $class): void {
             'App\\Controllers\\FailureController' => $ctrl,
             'App\\Controllers\\DurController'     => $ctrl,
             'App\\Controllers\\AdminController'   => $ctrl,
-        'App\\Controllers\\AjaxController'    => $ctrl,
+            'App\\Controllers\\AjaxController'    => $ctrl,
+            'App\\Controllers\\UserController'    => $ctrl,
         ];
     }
     if (isset($map[$class]) && !class_exists($class, false)) {
@@ -62,6 +63,10 @@ $routes = [
     'dur'                 => ['App\\Controllers\\DurController',     'list'],
     'dur_add'             => ['App\\Controllers\\DurController',     'addForm'],
     'dur_add_post'        => ['App\\Controllers\\DurController',     'addPost'],
+       // ── Nowe trasy — użytkownik ──────────────────────────────
+    'change_password'     => ['App\\Controllers\\UserController',   'changePassword'],
+    'my_failures'         => ['App\\Controllers\\UserController',   'myFailures'],
+    // ─────────────────────────────────────────────────────────
     'dur_detail'          => ['App\\Controllers\\DurController',     'detail'],
     'admin_users'         => ['App\\Controllers\\AdminController',   'users'],
     'admin_user_save'     => ['App\\Controllers\\AdminController',   'userSave'],

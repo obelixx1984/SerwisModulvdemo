@@ -318,6 +318,180 @@ $adminRoutes = [
       background: #f3f4f6;
     }
 
+    .topbar-user-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .topbar-user-btn {
+      background: none;
+      border: 1px solid #e5e7eb;
+      border-radius: 7px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: #374151;
+      cursor: pointer;
+      font-family: Arial, Helvetica, sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background .12s, border-color .12s;
+    }
+
+    .topbar-user-btn:hover,
+    .topbar-user-btn.open {
+      background: #f3f4f6;
+      border-color: #0a2463;
+      color: #0a2463;
+    }
+
+    .topbar-user-btn .u-arrow {
+      font-size: 10px;
+      opacity: .5;
+      transition: transform .15s;
+    }
+
+    .topbar-user-btn.open .u-arrow {
+      transform: rotate(180deg);
+      opacity: 1;
+    }
+
+    .user-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      min-width: 200px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 9px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .10);
+      z-index: 999;
+      overflow: hidden;
+      animation: dropFadeIn .12s ease;
+    }
+
+    @keyframes dropFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .user-dropdown.open {
+      display: block;
+    }
+
+    .user-dropdown a,
+    .user-dropdown button {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 15px;
+      font-size: 13px;
+      color: #374151;
+      text-decoration: none;
+      background: none;
+      border: none;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      font-family: Arial, Helvetica, sans-serif;
+      transition: background .1s;
+    }
+
+    .user-dropdown a:hover,
+    .user-dropdown button:hover {
+      background: #f3f4f6;
+    }
+
+    .user-dropdown .ud-sep {
+      height: 1px;
+      background: #f3f4f6;
+      margin: 3px 0;
+    }
+
+    .user-dropdown .ud-logout {
+      color: #dc2626;
+    }
+
+    .user-dropdown .ud-logout:hover {
+      background: #fef2f2;
+    }
+
+    /* ══ NOWE: Modal zmiany hasła ════════════════════════════════ */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .45);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: #fff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .20);
+      overflow: hidden;
+      animation: modalIn .15s ease;
+    }
+
+    @keyframes modalIn {
+      from {
+        opacity: 0;
+        transform: scale(.96);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .modal-head {
+      background: #0a2463;
+      color: #fff;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, .7);
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .modal-close:hover {
+      color: #fff;
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
     /* ── Page ── */
     .page {
       padding: 20px 24px;
@@ -1177,8 +1351,48 @@ $adminRoutes = [
         <div class="topbar-title"><?= Helpers::e($pageTitle ?? 'Moduł Serwis') ?></div>
         <div class="topbar-right">
           <?php if ($user): ?>
-            <span class="topbar-user"><?= Helpers::e($user['name']) ?></span>
-            <a href="<?= BASE_URL ?>/index.php?route=logout" class="btn-logout">Wyloguj</a>
+            <!-- Dropdown użytkownika -->
+            <div class="topbar-user-wrap">
+              <button
+                class="topbar-user-btn"
+                id="userMenuBtn"
+                onclick="toggleUserMenu(event)"
+                type="button"
+                aria-haspopup="true"
+                aria-expanded="false">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                <?= Helpers::e($user['name']) ?>
+                <span class="u-arrow">▼</span>
+              </button>
+              <div class="user-dropdown" id="userDropdown">
+                <button type="button" onclick="openPassModal()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0110 0v4" />
+                  </svg>
+                  Zmiana hasła
+                </button>
+                <a href="<?= BASE_URL ?>/index.php?route=my_failures">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 11l3 3L22 4" />
+                    <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                  </svg>
+                  Moje zgłoszenia
+                </a>
+                <div class="ud-sep"></div>
+                <a href="<?= BASE_URL ?>/index.php?route=logout" class="ud-logout">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  Wyloguj
+                </a>
+              </div>
+            </div>
           <?php else: ?>
             <a href="<?= BASE_URL ?>/index.php?route=login" class="btn-logout">Zaloguj się</a>
           <?php endif; ?>

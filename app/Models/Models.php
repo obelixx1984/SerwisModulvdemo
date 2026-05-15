@@ -53,6 +53,15 @@ class UserModel extends BaseModel
         );
     }
 
+    public function changePassword(int $userId, string $newPassword): void
+    {
+        $hash = password_hash($newPassword, PASSWORD_BCRYPT);
+        $this->execute(
+            "UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ?",
+            [$hash, $userId]
+        );
+    }
+
     public function getAll(): array
     {
         return $this->fetchAll(
@@ -503,6 +512,10 @@ class FailureModel extends BaseModel
             $params[] = $s;
             $params[] = $s;
         }
+        if (!empty($filters['reporter_user_id'])) {
+            $where[]  = 'f.reporter_user_id = ?';
+            $params[] = (int)$filters['reporter_user_id'];
+        }
         $sql = $this->baseSelect()
             . ' WHERE ' . implode(' AND ', $where)
             . ' ORDER BY f.created_at DESC'
@@ -537,6 +550,10 @@ class FailureModel extends BaseModel
             $params[] = $s;
             $params[] = $s;
         }
+        if (!empty($filters['reporter_user_id'])) {
+            $where[]  = 'f.reporter_user_id = ?';
+            $params[] = (int)$filters['reporter_user_id'];
+        }
         // Zmiana 1: LEFT JOIN failure_symptoms potrzebny też w COUNT gdy filtrujemy po symptom_name
         $st = $this->db->prepare(
             "SELECT COUNT(*) FROM failures f
@@ -564,20 +581,43 @@ class FailureModel extends BaseModel
         return $this->execute(
             "INSERT INTO failures
              (ticket_number, production_line_id, subsystem_id, symptom_id, category_id, status_id,
-              dictionary_item_id, reporter_acronym, reporter_name, description)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              dictionary_item_id, reporter_acronym, reporter_name, reporter_user_id, description)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 $d['ticket_number'],
                 $d['production_line_id'],
                 $d['subsystem_id'] ?? null,
                 $d['symptom_id'] ?? null,
-                null,    // category_id ustawia mechanik — Zmiana 1
+                $d['category_id'] ?? null,
                 $d['status_id'],
-                null,    // dictionary_item_id ustawia mechanik — Zmiana 1
+                $d['dictionary_item_id'] ?? null,
                 $d['reporter_acronym'] ?? null,
                 $d['reporter_name'] ?? null,
+                $d['reporter_user_id'] ?? null,   // ← NOWE
                 $d['description'] ?? null,
             ]
+        );
+    }
+
+    public function getByReporterUserId(int $userId, string $reporterName = ''): array
+    {
+        if ($userId > 0) {
+            // Właściwe filtrowanie po user_id (po migracji)
+            return $this->fetchAll(
+                $this->baseSelect() .
+                    " WHERE f.reporter_user_id = ?
+                  ORDER BY f.created_at DESC
+                  LIMIT 200",
+                [$userId]
+            );
+        }
+        // Fallback: filtrowanie po imieniu i nazwisku (dla starych rekordów)
+        return $this->fetchAll(
+            $this->baseSelect() .
+                " WHERE f.reporter_name = ?
+              ORDER BY f.created_at DESC
+              LIMIT 200",
+            [$reporterName]
         );
     }
 
@@ -726,7 +766,7 @@ class FailureModel extends BaseModel
         );
     }
 
-       /** ZMIANA 3: Zlicz awarie zgłoszone w bieżącym miesiącu i roku */
+    /** ZMIANA 3: Zlicz awarie zgłoszone w bieżącym miesiącu i roku */
     public function getMonthlyFailureCount(): int
     {
         $row = $this->fetchOne(
@@ -803,6 +843,27 @@ class MaintenanceModel extends BaseModel
         );
     }
 
+    public function findScheduleByLineAndType(int $lineId, string $reviewType): ?array
+    {
+        return $this->fetchOne(
+            "SELECT * FROM maintenance_schedules
+             WHERE production_line_id = ?
+               AND review_type = ?
+               AND is_active = 1
+             ORDER BY next_due_date ASC
+             LIMIT 1",
+            [$lineId, $reviewType]
+        );
+    }
+
+    public function updateScheduleNextDate(int $id, string $nextDate): void
+    {
+        $this->execute(
+            "UPDATE maintenance_schedules SET next_due_date = ?, updated_at = NOW() WHERE id = ?",
+            [$nextDate, $id]
+        );
+    }
+
     public function getReviewsByLine(int $lineId, int $limit = 5): array
     {
         return $this->fetchAll(
@@ -868,6 +929,12 @@ class MaintenanceModel extends BaseModel
              JOIN production_lines pl ON pl.id = ms.production_line_id
              WHERE ms.is_active = 1
                AND ms.next_due_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+               AND NOT EXISTS (
+                   SELECT 1 FROM maintenance_reviews mr
+                   WHERE mr.production_line_id = ms.production_line_id
+                     AND mr.review_type        = ms.review_type
+                     AND mr.review_date >= DATE_SUB(ms.next_due_date, INTERVAL ms.interval_days DAY)
+               )
              ORDER BY ms.next_due_date ASC",
             [$days]
         );
