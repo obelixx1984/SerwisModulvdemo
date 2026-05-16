@@ -48,7 +48,7 @@ $durStatusConfig = $durStatusConfig ?? [
       <table>
         <thead>
           <tr>
-            <th>Linia</th><th>Szablon</th><th>Typ</th>
+            <th>Linia</th><th>Typ</th>
             <th>Co ile dni</th><th>Następny</th><th>Aktywny</th><th></th>
           </tr>
         </thead>
@@ -60,7 +60,6 @@ $durStatusConfig = $durStatusConfig ?? [
         ?>
         <tr>
           <td class="fw6"><?= Helpers::e($s['line_name']) ?></td>
-          <td class="fs-sm muted"><?= Helpers::e($s['template_name'] ?? '—') ?></td>
           <td><?= Helpers::statusBadge(Helpers::reviewTypeLabel($s['review_type']), '#7c3aed') ?></td>
           <td class="muted fs-sm"><?= $s['interval_days'] ?></td>
           <td>
@@ -117,17 +116,7 @@ $durStatusConfig = $durStatusConfig ?? [
           </select>
         </div>
 
-        <div class="fg">
-          <label class="flbl">Szablon DUR</label>
-          <select class="fc" name="template_id" id="schedTmpl">
-            <option value="">— Bez szablonu —</option>
-            <?php foreach ($templates as $t): ?>
-            <option value="<?= $t['id'] ?>"><?= Helpers::e($t['name']) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-
-        <?php /* ZMIANA 1: select filtrowany przez $activeTypes */ ?>
+        <?php /* Typ przeglądu — aktywne typy z settings */ ?>
         <div class="fg">
           <label class="flbl">Typ przeglądu</label>
           <select class="fc" name="review_type" id="schedType">
@@ -223,15 +212,14 @@ $durStatusConfig = $durStatusConfig ?? [
 </div>
 
 <script>
-// ZMIANA 1: wypełnij formularz edycji harmonogramu
+// Problem 1: wypełnij formularz edycji harmonogramu (bez template_id)
 document.querySelectorAll('.edit-sched-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {
-    document.getElementById('schedId').value    = this.dataset.id;
-    document.getElementById('schedLine').value  = this.dataset.line;
-    document.getElementById('schedTmpl').value  = this.dataset.tmpl;
-    document.getElementById('schedType').value  = this.dataset.type;
-    document.getElementById('schedDays').value  = this.dataset.days;
-    document.getElementById('schedNext').value  = this.dataset.next;
+    document.getElementById('schedId').value     = this.dataset.id;
+    document.getElementById('schedLine').value   = this.dataset.line;
+    document.getElementById('schedType').value   = this.dataset.type;
+    document.getElementById('schedDays').value   = this.dataset.days;
+    document.getElementById('schedNext').value   = this.dataset.next;
     document.getElementById('schedActive').value = this.dataset.active;
     document.getElementById('schedFormTitle').textContent = 'Edytuj harmonogram';
     window.scrollTo({top: 0, behavior: 'smooth'});
@@ -239,12 +227,11 @@ document.querySelectorAll('.edit-sched-btn').forEach(function(btn) {
 });
 
 function resetSchedForm() {
-  document.getElementById('schedId').value    = '0';
-  document.getElementById('schedLine').value  = '';
-  document.getElementById('schedTmpl').value  = '';
-  document.getElementById('schedType').value  = '<?= reset($activeTypes) ?? 'monthly' ?>';
-  document.getElementById('schedDays').value  = '30';
-  document.getElementById('schedNext').value  = '';
+  document.getElementById('schedId').value     = '0';
+  document.getElementById('schedLine').value   = '';
+  document.getElementById('schedType').value   = '<?= reset($activeTypes) ?? 'monthly' ?>';
+  document.getElementById('schedDays').value   = '30';
+  document.getElementById('schedNext').value   = '';
   document.getElementById('schedActive').value = '1';
   document.getElementById('schedFormTitle').textContent = 'Nowa pozycja harmonogramu';
 }

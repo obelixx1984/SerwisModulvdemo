@@ -1016,19 +1016,12 @@ class MaintenanceModel extends BaseModel
     {
         return $this->fetchAll(
             "SELECT ms.*, pl.name AS line_name,
-                DATEDIFF(ms.next_due_date, CURDATE()) AS days_left
-         FROM maintenance_schedules ms
-         JOIN production_lines pl ON pl.id = ms.production_line_id
-         WHERE ms.is_active = 1
-           AND ms.next_due_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
-           AND NOT EXISTS (
-               SELECT 1 FROM maintenance_reviews mr
-               WHERE mr.production_line_id = ms.production_line_id
-                 AND mr.review_type        = ms.review_type
-                 AND mr.review_date >= DATE_SUB(ms.next_due_date, INTERVAL ms.interval_days DAY)
-                 AND mr.review_date <= ms.next_due_date
-           )
-         ORDER BY ms.next_due_date ASC",
+                    DATEDIFF(ms.next_due_date, CURDATE()) AS days_left
+             FROM maintenance_schedules ms
+             JOIN production_lines pl ON pl.id = ms.production_line_id
+             WHERE ms.is_active = 1
+               AND ms.next_due_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+             ORDER BY ms.next_due_date ASC",
             [$days]
         );
     }
@@ -1042,13 +1035,11 @@ class MaintenanceModel extends BaseModel
     public function getSchedules(): array
     {
         return $this->fetchAll(
-            "SELECT ms.*, pl.name AS line_name, mt.name AS template_name,
-                    DATEDIFF(ms.next_due_date, CURDATE()) AS days_left
-             FROM maintenance_schedules ms
-             JOIN production_lines pl ON pl.id = ms.production_line_id
-             JOIN maintenance_templates mt ON mt.id = ms.template_id
-             WHERE ms.is_active = 1
-             ORDER BY ms.next_due_date ASC"
+            "SELECT ms.*, pl.name AS line_name,
+                DATEDIFF(ms.next_due_date, CURDATE()) AS days_left
+         FROM maintenance_schedules ms
+         JOIN production_lines pl ON pl.id = ms.production_line_id
+         ORDER BY ms.next_due_date ASC"
         );
     }
 
@@ -1088,11 +1079,10 @@ class MaintenanceModel extends BaseModel
     {
         return $this->execute(
             "INSERT INTO maintenance_schedules
-             (production_line_id, template_id, review_type, interval_days, next_due_date, is_active)
-             VALUES (?, ?, ?, ?, ?, ?)",
+           (production_line_id, review_type, interval_days, next_due_date, is_active)
+           VALUES (?, ?, ?, ?, ?)",
             [
                 $d['production_line_id'],
-                $d['template_id'],
                 $d['review_type'],
                 $d['interval_days'],
                 $d['next_due_date'],
@@ -1105,12 +1095,11 @@ class MaintenanceModel extends BaseModel
     {
         $this->execute(
             "UPDATE maintenance_schedules
-             SET production_line_id=?, template_id=?, review_type=?,
-                 interval_days=?, next_due_date=?, is_active=?
-             WHERE id=?",
+           SET production_line_id=?, review_type=?,
+               interval_days=?, next_due_date=?, is_active=?
+           WHERE id=?",
             [
                 $d['production_line_id'],
-                $d['template_id'],
                 $d['review_type'],
                 $d['interval_days'],
                 $d['next_due_date'],

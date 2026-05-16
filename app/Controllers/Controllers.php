@@ -1282,7 +1282,6 @@ class AdminController
         }
         $id         = (int)($_POST['sched_id'] ?? 0);
         $lineId     = (int)($_POST['production_line_id'] ?? 0);
-        $tmplId     = !empty($_POST['template_id']) ? (int)$_POST['template_id'] : null;
         $reviewType = $_POST['review_type'] ?? 'monthly';
         $days       = max(1, (int)($_POST['interval_days'] ?? 30));
         $nextDate   = trim($_POST['next_due_date'] ?? '');
@@ -1295,7 +1294,6 @@ class AdminController
         $mm   = new MaintenanceModel();
         $data = [
             'production_line_id' => $lineId,
-            'template_id' => $tmplId,
             'review_type' => $reviewType,
             'interval_days' => $days,
             'next_due_date' => $nextDate,
