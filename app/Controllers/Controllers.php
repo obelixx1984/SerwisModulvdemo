@@ -371,11 +371,14 @@ class FailureController
         }
 
         $user       = Auth::user();
-        $canEdit    = Auth::isMechanic() || Auth::hasPermission('failures');
+        // Dostęp do strony (widok): mechanik, uprawnienie 'failures' LUB zgłaszający
+        $canView    = Auth::isMechanic() || Auth::hasPermission('failures');
         $isReporter = (int)($failure['reporter_user_id'] ?? 0) === (int)$user['id'];
+        // Możliwość edycji (formularze): tylko mechanik LUB uprawnienie 'statuses'
+        $canEdit    = Auth::isMechanic() || Auth::hasPermission('statuses');
 
-        // Dostęp: mechanik / uprawniony ALBO zgłaszający tej awarii
-        if (!$canEdit && !$isReporter) {
+        // Dostęp: widok LUB zgłaszający tej awarii
+        if (!$canView && !$isReporter) {
             Helpers::flash('error', 'Brak uprawnień do szczegółów zgłoszenia.');
             Helpers::redirect('dashboard');
             return;
@@ -1371,15 +1374,22 @@ class AdminController
         if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
             Helpers::flash('error', 'Błąd bezpieczeństwa.');
             Helpers::redirect('admin_dur_tmpl');
+            return;
         }
-        $keys   = ['weekly', 'monthly', 'quarterly', 'biannual', 'annual', 'ad_hoc'];
-        $labels = [];
-        foreach ($keys as $k) {
-            $v = trim($_POST['type_' . $k] ?? '');
-            if ($v) $labels[$k] = $v;
+        $validKeys   = ['weekly', 'monthly', 'quarterly', 'biannual', 'annual', 'ad_hoc'];
+        $activeTypes = [];
+        foreach ($validKeys as $k) {
+            if (!empty($_POST['active_types']) && in_array($k, (array)$_POST['active_types'])) {
+                $activeTypes[] = $k;
+            }
         }
-        (new \App\Models\SettingsModel())->set('dur_type_labels', json_encode($labels));
-        Helpers::flash('success', 'Etykiety typów DUR zapisane.');
+        if (empty($activeTypes)) {
+            Helpers::flash('error', 'Zaznacz co najmniej jeden typ przeglądu.');
+            Helpers::redirect('admin_dur_tmpl');
+            return;
+        }
+        (new \App\Models\SettingsModel())->set('dur_active_review_types', json_encode($activeTypes));
+        Helpers::flash('success', 'Aktywne typy przeglądów DUR zapisane.');
         Helpers::redirect('admin_dur_tmpl');
     }
 

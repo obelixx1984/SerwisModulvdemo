@@ -9,6 +9,11 @@ $pageTitle = 'Zgłoszenia awarii';
 require BASE_PATH . '/templates/shared/header.php';
 ?>
 
+<!-- Nagłówek z przyciskiem -->
+<div class="sh mb2">
+  <a href="<?= BASE_URL ?>/index.php?route=report" class="btn btn-p btn-sm">+ Nowe zgłoszenie</a>
+</div>
+
 <!-- Filtry -->
 <div class="card mb2">
   <div class="card-body" style="padding:10px 14px;">

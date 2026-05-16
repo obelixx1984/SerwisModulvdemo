@@ -1,7 +1,30 @@
 <?php
+// templates/admin/dur_templates.php
+// ZMIANA 3: sekcja "Typy przeglądów DUR" zmieniona z edycji etykiet
+//           na checkboxy aktywności (które typy mają być dostępne)
+
 use App\Helpers\Helpers;
 $pageTitle = 'Szablony DUR';
 require BASE_PATH . '/templates/shared/header.php';
+
+// Pobierz aktywne typy z ustawień
+$activeTypes = ['weekly','monthly','quarterly','biannual','annual','ad_hoc']; // domyślnie wszystkie
+try {
+    $saved = (new \App\Models\SettingsModel())->get('dur_active_review_types');
+    if ($saved) {
+        $decoded = json_decode($saved, true);
+        if (is_array($decoded)) $activeTypes = $decoded;
+    }
+} catch (\Throwable $e) {}
+
+$allTypes = [
+    'weekly'    => 'Tygodniowy',
+    'monthly'   => 'Miesięczny',
+    'quarterly' => 'Kwartalny',
+    'biannual'  => 'Półroczny',
+    'annual'    => 'Roczny',
+    'ad_hoc'    => 'Doraźny',
+];
 ?>
 
 <div class="atabs mb2">
@@ -61,12 +84,11 @@ require BASE_PATH . '/templates/shared/header.php';
         <div class="fg">
           <label class="flbl">Typ przeglądu</label>
           <select class="fc" name="review_type" id="tmplType">
-            <option value="weekly">Tygodniowy</option>
-            <option value="monthly" selected>Miesięczny</option>
-            <option value="quarterly">Kwartalny</option>
-            <option value="biannual">Półroczny</option>
-            <option value="annual">Roczny</option>
-            <option value="ad_hoc">Doraźny</option>
+            <?php foreach ($allTypes as $key => $label): ?>
+              <?php if (in_array($key, $activeTypes)): ?>
+                <option value="<?= $key ?>" <?= $key === 'monthly' ? 'selected' : '' ?>><?= $label ?></option>
+              <?php endif; ?>
+            <?php endforeach; ?>
           </select>
         </div>
         <div class="fg">
@@ -112,38 +134,30 @@ function resetTmplForm(){
 }
 </script>
 
-<!-- BŁĄD 8: Zarządzanie typami przeglądów -->
-<div class="card mt2" style="margin-top:16px;">
-  <div class="card-head"><span class="card-title">Typy przeglądów DUR</span></div>
+<?php /* ZMIANA 3: checkboxy aktywności typów przeglądów DUR */ ?>
+<div class="card" style="margin-top:16px;">
+  <div class="card-head"><span class="card-title">Typy przeglądów DUR — aktywność</span></div>
   <div class="card-body">
-    <div class="alert alert-i fs-sm mb2">
-      Dostępne typy są zdefiniowane systemowo. Możesz zmienić ich etykiety wyświetlane w aplikacji.
+    <div class="alert alert-i fs-sm" style="margin-bottom:14px;">
+      Zaznacz typy przeglądów które mają być dostępne przy dodawaniu szablonów i harmonogramów.
+      Odznaczenie typu nie usuwa istniejących danych — tylko ukrywa go w formularzach.
     </div>
     <form method="POST" action="<?= BASE_URL ?>/index.php?route=admin_dur_types_save">
       <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-        <?php
-        $typeKeys = ['weekly','monthly','quarterly','biannual','annual','ad_hoc'];
-        $defaultLabels = ['weekly'=>'Tygodniowy','monthly'=>'Miesięczny','quarterly'=>'Kwartalny',
-                          'biannual'=>'Półroczny','annual'=>'Roczny','ad_hoc'=>'Doraźny'];
-        $savedLabels = [];
-        try {
-            $db = \App\Helpers\Database::get();
-            $st = $db->prepare("SELECT svalue FROM settings WHERE skey='dur_type_labels' LIMIT 1");
-            $st->execute();
-            $val = $st->fetchColumn();
-            if ($val) $savedLabels = json_decode($val, true) ?? [];
-        } catch(\Throwable $e) {}
-        foreach ($typeKeys as $key):
-          $label = $savedLabels[$key] ?? $defaultLabels[$key];
-        ?>
-        <div class="fg">
-          <label class="flbl"><?= $key ?></label>
-          <input class="fc" name="type_<?= $key ?>" value="<?= Helpers::e($label) ?>">
-        </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+        <?php foreach ($allTypes as $key => $label): ?>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:7px;">
+            <input
+              type="checkbox"
+              name="active_types[]"
+              value="<?= $key ?>"
+              <?= in_array($key, $activeTypes) ? 'checked' : '' ?>
+              style="width:15px;height:15px;cursor:pointer;flex-shrink:0;">
+            <span style="font-size:13px;font-weight:600;color:#374151;"><?= $label ?></span>
+          </label>
         <?php endforeach; ?>
       </div>
-      <button type="submit" class="btn btn-p btn-sm mt1">Zapisz etykiety typów</button>
+      <button type="submit" class="btn btn-p btn-sm">Zapisz aktywne typy</button>
     </form>
   </div>
 </div>

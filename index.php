@@ -84,6 +84,7 @@ $routes = [
     'admin_symptom_save'  => ['App\\Controllers\\AdminController',   'symptomSave'],    // Zmiana 1
     'admin_symptom_delete' => ['App\\Controllers\\AdminController',   'symptomDelete'],  // Zmiana 1
     'admin_dur_tmpl'      => ['App\\Controllers\\AdminController',   'durTemplates'],
+    'admin_dur_types_save' => ['App\\Controllers\\AdminController',  'durTypesSave'],
     'admin_dur_sched'     => ['App\\Controllers\\AdminController',   'durSchedules'],
     'admin_settings'      => ['App\\Controllers\\AdminController',   'settings'],
     'admin_settings_save' => ['App\\Controllers\\AdminController',   'settingsSave'],

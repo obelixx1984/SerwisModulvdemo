@@ -1016,18 +1016,19 @@ class MaintenanceModel extends BaseModel
     {
         return $this->fetchAll(
             "SELECT ms.*, pl.name AS line_name,
-                    DATEDIFF(ms.next_due_date, CURDATE()) AS days_left
-             FROM maintenance_schedules ms
-             JOIN production_lines pl ON pl.id = ms.production_line_id
-             WHERE ms.is_active = 1
-               AND ms.next_due_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
-               AND NOT EXISTS (
-                   SELECT 1 FROM maintenance_reviews mr
-                   WHERE mr.production_line_id = ms.production_line_id
-                     AND mr.review_type        = ms.review_type
-                     AND mr.review_date >= DATE_SUB(ms.next_due_date, INTERVAL ms.interval_days DAY)
-               )
-             ORDER BY ms.next_due_date ASC",
+                DATEDIFF(ms.next_due_date, CURDATE()) AS days_left
+         FROM maintenance_schedules ms
+         JOIN production_lines pl ON pl.id = ms.production_line_id
+         WHERE ms.is_active = 1
+           AND ms.next_due_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+           AND NOT EXISTS (
+               SELECT 1 FROM maintenance_reviews mr
+               WHERE mr.production_line_id = ms.production_line_id
+                 AND mr.review_type        = ms.review_type
+                 AND mr.review_date >= DATE_SUB(ms.next_due_date, INTERVAL ms.interval_days DAY)
+                 AND mr.review_date <= ms.next_due_date
+           )
+         ORDER BY ms.next_due_date ASC",
             [$days]
         );
     }
