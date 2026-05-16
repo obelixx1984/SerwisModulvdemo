@@ -5,6 +5,18 @@
 use App\Helpers\Helpers;
 $pageTitle = 'Przeglądy DUR';
 require BASE_PATH . '/templates/shared/header.php';
+
+// ZMIANA 2: odczyt konfiguracji statusów z settings
+$durStatusConfig = [];
+try {
+    $saved = (new \App\Models\SettingsModel())->get('dur_review_statuses');
+    if ($saved) $durStatusConfig = json_decode($saved, true) ?? [];
+} catch (\Throwable $e) {}
+$durStatusConfig += [
+    'completed'   => ['label' => 'Zakończony', 'color' => '#16a34a'],
+    'partial'     => ['label' => 'Częściowy',  'color' => '#d97706'],
+    'interrupted' => ['label' => 'Przerwany',  'color' => '#dc2626'],
+];
 ?>
 
 <div class="sh mb2">
@@ -70,8 +82,8 @@ require BASE_PATH . '/templates/shared/header.php';
 <!-- Siatka kart DUR -->
 <div class="g2">
   <?php foreach ($reviews as $r):
-    $sc = ['completed' => '#16a34a', 'partial' => '#d97706', 'interrupted' => '#dc2626'][$r['status']] ?? '#374151';
-    $sl = ['completed' => 'Zakończony', 'partial' => 'Częściowy', 'interrupted' => 'Przerwany'][$r['status']] ?? $r['status'];
+    $sc = $durStatusConfig[$r['status']]['color'] ?? '#374151';
+    $sl = $durStatusConfig[$r['status']]['label'] ?? $r['status'];
   ?>
   <div class="dur-card">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">

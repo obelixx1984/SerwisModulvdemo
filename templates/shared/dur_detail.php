@@ -6,8 +6,20 @@ use App\Helpers\Helpers;
 $pageTitle = 'Szczegóły DUR';
 require BASE_PATH . '/templates/shared/header.php';
 
-$sc = ['completed' => '#16a34a', 'partial' => '#d97706', 'interrupted' => '#dc2626'][$review['status']] ?? '#374151';
-$sl = ['completed' => 'Zakończony', 'partial' => 'Częściowy', 'interrupted' => 'Przerwany'][$review['status']] ?? $review['status'];
+// ZMIANA 2: odczyt konfiguracji statusów z settings
+$durStatusConfig = [];
+try {
+    $saved = (new \App\Models\SettingsModel())->get('dur_review_statuses');
+    if ($saved) $durStatusConfig = json_decode($saved, true) ?? [];
+} catch (\Throwable $e) {}
+$durStatusConfig += [
+    'completed'   => ['label' => 'Zakończony', 'color' => '#16a34a'],
+    'partial'     => ['label' => 'Częściowy',  'color' => '#d97706'],
+    'interrupted' => ['label' => 'Przerwany',  'color' => '#dc2626'],
+];
+
+$sc = $durStatusConfig[$review['status']]['color'] ?? '#374151';
+$sl = $durStatusConfig[$review['status']]['label'] ?? $review['status'];
 
 $currentUser  = \App\Helpers\Auth::user();
 $isAuthor     = (int)($review['performed_by'] ?? 0) === (int)$currentUser['id'];

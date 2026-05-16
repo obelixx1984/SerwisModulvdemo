@@ -8,6 +8,18 @@ use App\Helpers\Auth;
 
 $pageTitle = 'Edytuj raport DUR';
 require BASE_PATH . '/templates/shared/header.php';
+
+// ZMIANA 2: odczyt konfiguracji statusów z settings
+$durStatusConfig = [];
+try {
+    $saved = (new \App\Models\SettingsModel())->get('dur_review_statuses');
+    if ($saved) $durStatusConfig = json_decode($saved, true) ?? [];
+} catch (\Throwable $e) {}
+$durStatusConfig += [
+    'completed'   => ['label' => 'Zakończony', 'color' => '#16a34a'],
+    'partial'     => ['label' => 'Częściowy',  'color' => '#d97706'],
+    'interrupted' => ['label' => 'Przerwany',  'color' => '#dc2626'],
+];
 ?>
 
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
@@ -85,9 +97,12 @@ require BASE_PATH . '/templates/shared/header.php';
           <div class="fg">
             <label class="flbl">Status przeglądu</label>
             <select name="status" class="fc">
-              <option value="completed"   <?= $review['status'] === 'completed'   ? 'selected' : '' ?>>Zakończony</option>
-              <option value="partial"     <?= $review['status'] === 'partial'     ? 'selected' : '' ?>>Częściowy — do dokończenia</option>
-              <option value="interrupted" <?= $review['status'] === 'interrupted' ? 'selected' : '' ?>>Przerwany — brak części</option>
+              <?php foreach (['completed', 'partial', 'interrupted'] as $sKey): ?>
+                <?php $sLabel = $durStatusConfig[$sKey]['label'] ?? $sKey; ?>
+                <option value="<?= $sKey ?>" <?= $review['status'] === $sKey ? 'selected' : '' ?>>
+                  <?= Helpers::e($sLabel) ?>
+                </option>
+              <?php endforeach; ?>
             </select>
           </div>
         </div>

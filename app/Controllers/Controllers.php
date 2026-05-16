@@ -601,6 +601,15 @@ class DurController
         Auth::requireMechanic();
         $lines     = (new ProductionLineModel())->getAll(true);
         $templates = (new MaintenanceModel())->getTemplates();
+
+        // Odczytaj aktywne typy przeglądów z ustawień
+        $activeTypes = ['weekly', 'monthly', 'quarterly', 'biannual', 'annual', 'ad_hoc'];
+        $saved = (new SettingsModel())->get('dur_active_review_types');
+        if ($saved) {
+            $decoded = json_decode($saved, true);
+            if (is_array($decoded) && $decoded) $activeTypes = $decoded;
+        }
+
         require BASE_PATH . '/templates/shared/dur_form.php';
     }
 
@@ -1237,6 +1246,30 @@ class AdminController
         $schedules = (new MaintenanceModel())->getSchedules();
         $lines     = (new ProductionLineModel())->getAll(true);
         $templates = (new MaintenanceModel())->getTemplates();
+        $sm        = new SettingsModel();
+
+        // Problem 1: aktywne typy przeglądów
+        $activeTypes = ['weekly', 'monthly', 'quarterly', 'biannual', 'annual', 'ad_hoc'];
+        $saved = $sm->get('dur_active_review_types');
+        if ($saved) {
+            $decoded = json_decode($saved, true);
+            if (is_array($decoded) && $decoded) $activeTypes = $decoded;
+        }
+
+        // Problem 2: konfiguracja statusów DUR
+        $durStatusConfig = [
+            'completed'   => ['label' => 'Zakończony', 'color' => '#16a34a'],
+            'partial'     => ['label' => 'Częściowy',  'color' => '#d97706'],
+            'interrupted' => ['label' => 'Przerwany',  'color' => '#dc2626'],
+        ];
+        $savedStatuses = $sm->get('dur_review_statuses');
+        if ($savedStatuses) {
+            $decodedStatuses = json_decode($savedStatuses, true);
+            if (is_array($decodedStatuses)) {
+                $durStatusConfig = array_merge($durStatusConfig, $decodedStatuses);
+            }
+        }
+
         require BASE_PATH . '/templates/admin/dur_schedules.php';
     }
 
@@ -1391,6 +1424,37 @@ class AdminController
         (new \App\Models\SettingsModel())->set('dur_active_review_types', json_encode($activeTypes));
         Helpers::flash('success', 'Aktywne typy przeglądów DUR zapisane.');
         Helpers::redirect('admin_dur_tmpl');
+    }
+
+    public function durStatusesSave(): void
+    {
+        Auth::requireAdmin();
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('admin_dur_sched');
+            return;
+        }
+
+        $validKeys = ['completed', 'partial', 'interrupted'];
+        $config    = [];
+
+        foreach ($validKeys as $key) {
+            $label    = trim($_POST['status'][$key]['label'] ?? '');
+            // Priorytet: color picker (hex_text wpisany ręcznie), fallback: input[type=color]
+            $colorHex = trim($_POST['status'][$key]['color_hex'] ?? '');
+            $colorPicker = trim($_POST['status'][$key]['color'] ?? '');
+            $color = preg_match('/^#[0-9a-fA-F]{6}$/', $colorHex)
+                ? $colorHex
+                : (preg_match('/^#[0-9a-fA-F]{6}$/', $colorPicker) ? $colorPicker : '#6b7280');
+
+            if ($label) {
+                $config[$key] = ['label' => $label, 'color' => $color];
+            }
+        }
+
+        (new SettingsModel())->set('dur_review_statuses', json_encode($config));
+        Helpers::flash('success', 'Nazwy i kolory statusów DUR zapisane.');
+        Helpers::redirect('admin_dur_sched');
     }
 
     public function deleteTmpl(): void
