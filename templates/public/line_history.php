@@ -5,6 +5,12 @@
 
 use App\Helpers\Helpers;
 
+$typeLabels = [];
+try {
+    $tl = (new \App\Models\SettingsModel())->get('dur_type_labels');
+    if ($tl) $typeLabels = json_decode($tl, true) ?? [];
+} catch (\Throwable $e) {}
+
 $pageTitle = 'Historia linii';
 require BASE_PATH . '/templates/shared/header.php';
 ?>
@@ -178,7 +184,7 @@ require BASE_PATH . '/templates/shared/header.php';
             <?php foreach ($durList as $r): ?>
               <div class="dur-card">
                 <div class="dur-title">
-                  <?= Helpers::reviewTypeLabel($r['review_type']) ?> — <?= Helpers::e($r['review_date']) ?>
+                  <?= Helpers::reviewTypeLabel($r['review_type'], $typeLabels) ?> — <?= Helpers::e($r['review_date']) ?>
                   <?= $r['subsystem_name'] ? ' · ' . Helpers::e($r['subsystem_name']) : '' ?>
                 </div>
                 <div class="dur-meta"><?= Helpers::e($r['performer_name']) ?> · <?= (int)$r['duration_minutes'] ?> min</div>

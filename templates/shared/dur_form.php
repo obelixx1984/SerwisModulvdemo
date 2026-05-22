@@ -53,7 +53,17 @@ foreach ($lines as $l) {
             'biannual'  => 'Półroczny',
             'annual'    => 'Roczny',
             'ad_hoc'    => 'Doraźny',
+            'periodic'  => 'Okresowy',
           ];
+          // Wczytaj niestandardowe nazwy typów z ustawień admina
+          try {
+            $tl = (new \App\Models\SettingsModel())->get('dur_type_labels');
+            if ($tl) {
+              foreach (json_decode($tl, true) ?? [] as $k => $v) {
+                if (isset($allTypes[$k])) $allTypes[$k] = $v;
+              }
+            }
+          } catch (\Throwable $e) {}
           ?>
           <select name="review_type" class="fc" required>
             <?php foreach ($allTypes as $key => $label): ?>

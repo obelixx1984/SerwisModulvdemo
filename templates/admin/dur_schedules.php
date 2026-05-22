@@ -15,9 +15,16 @@ $allTypes = [
     'biannual'  => 'Półroczny',
     'annual'    => 'Roczny',
     'ad_hoc'    => 'Doraźny',
+    'periodic'  => 'Okresowy',
 ];
+// Nadpisz nazwy niestandardowymi etykietami admina
+foreach ($typeLabels as $k => $v) {
+    if (isset($allTypes[$k]) && $v !== '') $allTypes[$k] = $v;
+}
+
 // $activeTypes przekazane z AdminController::durSchedules()
 $activeTypes = $activeTypes ?? array_keys($allTypes);
+$typeLabels = $typeLabels ?? [];
 
 // ZMIANA 2: konfiguracja statusów DUR z settings (przekazana z kontrolera)
 // $durStatusConfig przekazane z AdminController::durSchedules()
@@ -60,7 +67,7 @@ $durStatusConfig = $durStatusConfig ?? [
         ?>
         <tr>
           <td class="fw6"><?= Helpers::e($s['line_name']) ?></td>
-          <td><?= Helpers::statusBadge(Helpers::reviewTypeLabel($s['review_type']), '#7c3aed') ?></td>
+          <td><?= Helpers::statusBadge(Helpers::reviewTypeLabel($s['review_type'], $typeLabels ?? []), '#7c3aed') ?></td>
           <td class="muted fs-sm"><?= $s['interval_days'] ?></td>
           <td>
             <span class="fw6" style="color:<?= $color ?>;"><?= Helpers::e($s['next_due_date'] ?? '—') ?></span>

@@ -144,15 +144,20 @@ class Helpers
     }
 
     /** Typ przeglądu → etykieta PL */
-    public static function reviewTypeLabel(string $type): string
+    public static function reviewTypeLabel(string $type, array $customLabels = []): string
     {
-        return match($type) {
+        // Niestandardowa etykieta z ustawień admina
+        if (!empty($customLabels[$type])) {
+            return $customLabels[$type];
+        }
+        return match ($type) {
             'weekly'    => 'Tygodniowy',
             'monthly'   => 'Miesięczny',
             'quarterly' => 'Kwartalny',
             'biannual'  => 'Półroczny',
             'annual'    => 'Roczny',
             'ad_hoc'    => 'Doraźny',
+            'periodic'  => 'Okresowy',   // ← NOWE
             default     => ucfirst($type),
         };
     }

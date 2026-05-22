@@ -6,6 +6,13 @@ use App\Helpers\Helpers;
 $pageTitle = 'Przeglądy DUR';
 require BASE_PATH . '/templates/shared/header.php';
 
+
+$typeLabels = [];
+try {
+    $tl = (new \App\Models\SettingsModel())->get('dur_type_labels');
+    if ($tl) $typeLabels = json_decode($tl, true) ?? [];
+} catch (\Throwable $e) {}
+
 // ZMIANA 2: odczyt konfiguracji statusów z settings
 $durStatusConfig = [];
 try {
@@ -34,7 +41,7 @@ $durStatusConfig += [
     $bl = $dl <= 0 ? 'zaległy!' : 'za ' . $dl . ' dni';
   ?>
   <div class="dur-up-item">
-    <span><?= Helpers::e($u['line_name']) ?> — <?= Helpers::reviewTypeLabel($u['review_type']) ?></span>
+    <span><?= Helpers::e($u['line_name']) ?> — <?= Helpers::reviewTypeLabel($u['review_type'], $typeLabels) ?></span>
     <span class="badge" style="background:<?= $bc ?>;color:#fff;"><?= $bl ?></span>
   </div>
   <?php endforeach; ?>
@@ -89,7 +96,7 @@ $durStatusConfig += [
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">
       <div>
         <div class="dur-title">
-          <?= Helpers::reviewTypeLabel($r['review_type']) ?> — <?= Helpers::e($r['line_name']) ?>
+          <?= Helpers::reviewTypeLabel($r['review_type'], $typeLabels) ?> — <?= Helpers::e($r['line_name']) ?>
           <?= $r['subsystem_name'] ? ' · ' . Helpers::e($r['subsystem_name']) : '' ?>
         </div>
         <div class="dur-meta">

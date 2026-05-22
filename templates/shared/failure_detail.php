@@ -35,11 +35,7 @@ $mechanics   = $mechanics   ?? [];
 ?>
 
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-  <?php if ($canEdit): ?>
-    <a href="<?= BASE_URL ?>/index.php?route=failures" class="btn btn-sm">← Lista zgłoszeń</a>
-  <?php else: ?>
-    <a href="<?= BASE_URL ?>/index.php?route=my_failures" class="btn btn-sm">← Moje zgłoszenia</a>
-  <?php endif; ?>
+  <a href="#" onclick="history.back(); return false;" class="btn btn-sm">← Wróć</a>
   <h1 style="font-size:16px;font-weight:700;margin:0;">
     <?= Helpers::e($failure['ticket_number']) ?>
   </h1>
@@ -53,14 +49,14 @@ $mechanics   = $mechanics   ?? [];
       class="btn btn-p btn-sm"
       title="Edytuj objaw zgłoszenia"
       onclick="openEditModal(
-      <?= (int)$failure['id'] ?>,
-      <?= json_encode($failure['ticket_number'],   JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
-      <?= json_encode($failure['line_name'] ?? '',      JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
-      <?= json_encode($failure['subsystem_name'] ?? '', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
-      <?= (int)($failure['symptom_id'] ?? 0) ?>,
-      <?= !empty($failure['other_symptom']) ? 'true' : 'false' ?>,
-      <?= json_encode($failure['description'] ?? '', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>
-    )">
+        <?= (int)$failure['id'] ?>,
+        '<?= Helpers::e(addslashes($failure['ticket_number'])) ?>',
+        '<?= Helpers::e(addslashes($failure['line_name'] ?? '')) ?>',
+        '<?= Helpers::e(addslashes($failure['subsystem_name'] ?? '')) ?>',
+        <?= (int)($failure['symptom_id'] ?? 0) ?>,
+        <?= !empty($failure['other_symptom']) ? 'true' : 'false' ?>,
+        '<?= Helpers::e(addslashes($failure['description'] ?? '')) ?>'
+      )">
       ✏ Edytuj
     </button>
   <?php endif; ?>
@@ -558,8 +554,9 @@ $mechanics   = $mechanics   ?? [];
       </div>
 
       <form method="POST" action="<?= BASE_URL ?>/index.php?route=my_failure_edit" id="editSymptomForm">
-        <input type="hidden" name="csrf_token" value="<?= Auth::csrfToken() ?>">
+        <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
         <input type="hidden" name="failure_id" id="editFailureId" value="">
+        <input type="hidden" name="return_to" value="failure_detail">
 
         <?php /* ZMIANA: checkbox "Inne objawy" w modalu edycji */ ?>
         <label class="other-cb-row">
@@ -606,179 +603,163 @@ $mechanics   = $mechanics   ?? [];
 </div>
 
 <script>
-  // ── Filtrowanie słownika po kategorii ────────────────────────
-  document.addEventListener('DOMContentLoaded', function() {
-    var catSel = document.getElementById('mechCat');
-    var dictSel = document.getElementById('mechDict');
-    if (!catSel || !dictSel) return;
+/*
+ * KLUCZ ZMIANY: cały kod który wymaga DOM-u przeniesiony do
+ * DOMContentLoaded. "toggleOther" zmieniony z deklaracji funkcji
+ * (wewnątrz bloku if) na zmienną — to był główny błąd JS.
+ * Funkcje globalne (openEditModal itp.) zostają poza wrapperem.
+ */
+document.addEventListener('DOMContentLoaded', function () {
 
+  // ── Filtrowanie słownika po kategorii ──────────────────────
+  var catSel  = document.getElementById('mechCat');
+  var dictSel = document.getElementById('mechDict');
+  if (catSel && dictSel) {
     function filterDict(catId) {
-      var opts = dictSel.querySelectorAll('option[data-cat]');
-      opts.forEach(function(o) {
+      dictSel.querySelectorAll('option[data-cat]').forEach(function (o) {
         o.style.display = (!catId || o.dataset.cat == catId) ? '' : 'none';
       });
-      var visible = dictSel.querySelector('option[data-cat]:not([style*="display: none"])');
-      if (!visible) dictSel.value = '';
     }
-    catSel.addEventListener('change', function() {
-      filterDict(this.value);
-    });
+    catSel.addEventListener('change', function () { filterDict(this.value); });
     filterDict(catSel.value);
+  }
 
-    // Inna usterka — toggle textarea
-    var otherChk = document.getElementById('otherFailureChk');
-    var noteWrap = document.getElementById('mechanicNoteWrap');
-    var dictWrap = document.getElementById('dictWrap');
-    if (otherChk) {
-      function toggleOther() {
-        var on = otherChk.checked;
-        if (noteWrap) noteWrap.style.display = on ? '' : 'none';
-        if (dictWrap) dictWrap.style.display = on ? 'none' : '';
-      }
-      otherChk.addEventListener('change', toggleOther);
-      toggleOther();
-    }
-  });
+  // ── Inna usterka — toggle textarea ─────────────────────────
+  var otherChk = document.getElementById('otherFailureChk');
+  var noteWrap = document.getElementById('mechanicNoteWrap');
+  var dictWrap = document.getElementById('dictWrap');
+  if (otherChk) {
+    // WAŻNE: zmienna (var), NIE deklaracja funkcji wewnątrz bloku if
+    var toggleOther = function () {
+      var on = otherChk.checked;
+      if (noteWrap) noteWrap.style.display = on ? '' : 'none';
+      if (dictWrap) dictWrap.style.display = on ? 'none' : '';
+    };
+    otherChk.addEventListener('change', toggleOther);
+    toggleOther();
+  }
 
-  // ── Walidacja przed zmianą na status końcowy ─────────────────
-  (function() {
-    var sel = document.getElementById('statusSelect');
-    if (!sel) return;
+  // ── Walidacja przed zmianą na status końcowy ───────────────
+  var sel = document.getElementById('statusSelect');
+  if (sel) {
+    var hasCategory  = <?= !empty($failure['category_id']) ? 'true' : 'false' ?>;
+    var hasDict      = <?= (!empty($failure['dictionary_item_id']) || !empty($failure['other_failure'])) ? 'true' : 'false' ?>;
+    var crewCount    = <?= count($assignments) ?>;
+    var catNotice    = document.getElementById('catNotice');
+    var crewNotice   = document.getElementById('crewNotice');
 
-    // Dane potrzebne do walidacji (renderowane przez PHP do JS)
-    var hasCategory = <?= !empty($failure['category_id']) ? 'true' : 'false' ?>;
-    var hasDict = <?= (!empty($failure['dictionary_item_id']) || !empty($failure['other_failure'])) ? 'true' : 'false' ?>;
-    var crewCount = <?= count($assignments) ?>;
-    var catNotice = document.getElementById('catNotice');
-    var crewNotice = document.getElementById('crewNotice');
-
-    sel.addEventListener('change', function() {
-      var opt = this.options[this.selectedIndex];
+    sel.addEventListener('change', function () {
+      var opt     = this.options[this.selectedIndex];
       var isFinal = opt && opt.dataset.final === '1';
 
-      // Ukryj oba bannery przy każdej zmianie
-      if (catNotice) catNotice.style.display = 'none';
+      if (catNotice)  catNotice.style.display  = 'none';
       if (crewNotice) crewNotice.style.display = 'none';
-
       if (!isFinal) return;
 
-      // Sprawdź kategorię i usterkę
       if (!hasCategory || !hasDict) {
         if (catNotice) catNotice.style.display = 'block';
       }
-
-      // Sprawdź obsadę
       if (crewCount === 0) {
         if (crewNotice) crewNotice.style.display = 'block';
       }
     });
-
-    // Ukryj bannery gdy wybrano inny status
-    sel.addEventListener('change', function() {
-      var opt = this.options[this.selectedIndex];
-      if (!opt || opt.dataset.final !== '1') {
-        if (catNotice) catNotice.style.display = 'none';
-        if (crewNotice) crewNotice.style.display = 'none';
-      }
-    });
-  })();
-
-  function toggleOtherFailure(checked) {
-    var dictGrp = document.getElementById('dictGrp');
-    var dictSel = document.getElementById('mechDict');
-    var grp = document.getElementById('mechanicNoteGrp');
-    var note = document.getElementById('mechanicNote');
-
-    if (checked) {
-      // Inna usterka — zablokuj słownik, wymagaj notatki
-      if (dictGrp) {
-        dictGrp.style.opacity = '.4';
-        dictGrp.style.pointerEvents = 'none';
-      }
-      if (dictSel) {
-        dictSel.disabled = true;
-        dictSel.value = '';
-      }
-      if (grp) grp.style.display = 'block';
-      if (note) note.required = true;
-    } else {
-      // Normalna usterka — odblokuj słownik, ukryj notatkę
-      if (dictGrp) {
-        dictGrp.style.opacity = '';
-        dictGrp.style.pointerEvents = '';
-      }
-      if (dictSel) {
-        dictSel.disabled = false;
-      }
-      if (grp) grp.style.display = 'none';
-      if (note) {
-        note.required = false;
-      }
-    }
   }
 
-  function openEditModal(failureId, ticket, lineName, subsystemName, currentSymptomId, isOtherSymptom, currentDesc) {
-    document.getElementById('editFailureId').value = failureId;
-    document.getElementById('editModalTicket').textContent = ticket;
-    document.getElementById('editModalLine').textContent = lineName;
+}); // koniec DOMContentLoaded
 
-    var subsRow = document.getElementById('editModalSubsystemRow');
-    if (subsystemName && subsystemName.trim() !== '') {
-      document.getElementById('editModalSubsystem').textContent = subsystemName;
-      subsRow.style.display = '';
-    } else {
-      subsRow.style.display = 'none';
-    }
+// ── Funkcje globalne (muszą być poza DOMContentLoaded ─────────
+//    bo są wywoływane przez onclick="..." w HTML) ──────────────
 
-    var cb = document.getElementById('editOtherSymptomCb');
-    cb.checked = isOtherSymptom;
-    toggleEditOtherSymptom(isOtherSymptom);
+function toggleOtherFailure(checked) {
+  var dictGrp = document.getElementById('dictGrp');
+  var dictSel = document.getElementById('mechDict');
+  var grp     = document.getElementById('mechanicNoteGrp');
+  var note    = document.getElementById('mechanicNote');
 
-    if (isOtherSymptom) {
-      document.getElementById('editDescArea').value = currentDesc || '';
-    } else {
-      document.getElementById('editSymptomSelect').value = currentSymptomId || '';
-    }
+  if (checked) {
+    if (dictGrp) { dictGrp.style.opacity = '.4'; dictGrp.style.pointerEvents = 'none'; }
+    if (dictSel) { dictSel.disabled = true; dictSel.value = ''; }
+    if (grp)  grp.style.display  = 'block';
+    if (note) note.required      = true;
+  } else {
+    if (dictGrp) { dictGrp.style.opacity = ''; dictGrp.style.pointerEvents = ''; }
+    if (dictSel)   dictSel.disabled = false;
+    if (grp)  grp.style.display  = 'none';
+    if (note) note.required      = false;
+  }
+}
 
-    document.getElementById('editSymptomModal').classList.add('open');
+function openEditModal(failureId, ticket, lineName, subsystemName, currentSymptomId, isOtherSymptom, currentDesc) {
+  var idEl    = document.getElementById('editFailureId');
+  var tkEl    = document.getElementById('editModalTicket');
+  var lnEl    = document.getElementById('editModalLine');
+  var subsRow = document.getElementById('editModalSubsystemRow');
+  var subEl   = document.getElementById('editModalSubsystem');
+  var cb      = document.getElementById('editOtherSymptomCb');
+
+  if (!idEl || !cb) { console.error('Modal edycji nie znaleziony w DOM'); return; }
+
+  idEl.value       = failureId;
+  tkEl.textContent = ticket;
+  lnEl.textContent = lineName;
+
+  if (subsystemName && subsystemName.trim() !== '') {
+    subEl.textContent   = subsystemName;
+    subsRow.style.display = '';
+  } else {
+    subsRow.style.display = 'none';
+  }
+
+  cb.checked = isOtherSymptom;
+  toggleEditOtherSymptom(isOtherSymptom);
+
+  if (isOtherSymptom) {
+    var da = document.getElementById('editDescArea');
+    if (da) da.value = currentDesc || '';
+  } else {
+    var ss = document.getElementById('editSymptomSelect');
+    if (ss) ss.value = currentSymptomId || '';
+  }
+
+  var modal = document.getElementById('editSymptomModal');
+  if (modal) {
+    modal.classList.add('open');
     document.body.style.overflow = 'hidden';
   }
+}
 
-  function toggleEditOtherSymptom(checked) {
-    var symptomGrp = document.getElementById('editSymptomGrp');
-    var symptomSel = document.getElementById('editSymptomSelect');
-    var descGrp = document.getElementById('editDescGrp');
-    var descArea = document.getElementById('editDescArea');
+function toggleEditOtherSymptom(checked) {
+  var symptomGrp = document.getElementById('editSymptomGrp');
+  var symptomSel = document.getElementById('editSymptomSelect');
+  var descGrp    = document.getElementById('editDescGrp');
+  var descArea   = document.getElementById('editDescArea');
 
-    if (checked) {
-      symptomGrp.style.display = 'none';
-      symptomSel.disabled = true;
-      symptomSel.removeAttribute('required');
-      symptomSel.value = '';
-      descGrp.style.display = '';
-      descArea.required = true;
-    } else {
-      symptomGrp.style.display = '';
-      symptomSel.disabled = false;
-      symptomSel.required = true;
-      descGrp.style.display = 'none';
-      descArea.required = false;
-      descArea.value = '';
-    }
+  if (checked) {
+    if (symptomGrp) symptomGrp.style.display = 'none';
+    if (symptomSel) { symptomSel.disabled = true; symptomSel.removeAttribute('required'); symptomSel.value = ''; }
+    if (descGrp)    descGrp.style.display = '';
+    if (descArea)   descArea.required = true;
+  } else {
+    if (symptomGrp) symptomGrp.style.display = '';
+    if (symptomSel) { symptomSel.disabled = false; symptomSel.required = true; }
+    if (descGrp)    descGrp.style.display = 'none';
+    if (descArea)   { descArea.required = false; descArea.value = ''; }
   }
+}
 
-  function closeEditModal() {
-    document.getElementById('editSymptomModal').classList.remove('open');
-    document.body.style.overflow = '';
-  }
+function closeEditModal() {
+  var modal = document.getElementById('editSymptomModal');
+  if (modal) modal.classList.remove('open');
+  document.body.style.overflow = '';
+}
 
-  function closeEditModalOutside(e) {
-    if (e.target === document.getElementById('editSymptomModal')) closeEditModal();
-  }
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeEditModal();
-  });
+function closeEditModalOutside(e) {
+  if (e.target === document.getElementById('editSymptomModal')) closeEditModal();
+}
 
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closeEditModal();
+});
 </script>
 
 <?php require BASE_PATH . '/templates/shared/footer.php'; ?>

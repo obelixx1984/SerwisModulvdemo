@@ -1356,7 +1356,25 @@ class AdminController
     public function durTemplates(): void
     {
         Auth::requireAdmin();
-        $templates = (new MaintenanceModel())->getTemplates(false);
+        $templates   = (new MaintenanceModel())->getTemplates(false);
+        $sm          = new SettingsModel();
+
+        // Aktywne typy
+        $activeTypes = ['weekly', 'monthly', 'quarterly', 'biannual', 'annual', 'ad_hoc', 'periodic'];
+        $saved = $sm->get('dur_active_review_types');
+        if ($saved) {
+            $decoded = json_decode($saved, true);
+            if (is_array($decoded) && $decoded) $activeTypes = $decoded;
+        }
+
+        // Niestandardowe etykiety typów     ← NOWE
+        $typeLabels = [];
+        $savedLabels = $sm->get('dur_type_labels');
+        if ($savedLabels) {
+            $decoded = json_decode($savedLabels, true);
+            if (is_array($decoded)) $typeLabels = $decoded;
+        }
+
         require BASE_PATH . '/templates/admin/dur_templates.php';
     }
 
@@ -1367,6 +1385,37 @@ class AdminController
             Helpers::flash('error', 'Błąd bezpieczeństwa.');
             Helpers::redirect('admin_dur_tmpl');
         }
+
+        // ── NOWE: zapis aktywnych typów i etykiet ────────────
+        if (isset($_POST['save_types'])) {
+            $sm          = new SettingsModel();
+            $allTypeKeys = ['weekly', 'monthly', 'quarterly', 'biannual', 'annual', 'ad_hoc', 'periodic'];
+
+            // Aktywne typy (checkboxy)
+            $activeTypes = [];
+            foreach ($allTypeKeys as $key) {
+                if (!empty($_POST['type_active'][$key])) {
+                    $activeTypes[] = $key;
+                }
+            }
+            if (empty($activeTypes)) $activeTypes = ['monthly'];
+            $sm->set('dur_active_review_types', json_encode($activeTypes));
+
+            // Etykiety typów (pola tekstowe)
+            $typeLabels = [];
+            foreach ($allTypeKeys as $key) {
+                $label = trim($_POST['type_label'][$key] ?? '');
+                if ($label !== '') {
+                    $typeLabels[$key] = $label;
+                }
+            }
+            $sm->set('dur_type_labels', json_encode($typeLabels));
+
+            Helpers::flash('success', 'Typy przeglądów DUR zaktualizowane.');
+            Helpers::redirect('admin_dur_tmpl');
+            return;
+        }
+
         $id          = (int)($_POST['tmpl_id'] ?? 0);
         $name        = trim($_POST['name'] ?? '');
         $reviewType  = $_POST['review_type'] ?? 'monthly';
@@ -1424,6 +1473,13 @@ class AdminController
             if (is_array($decodedStatuses)) {
                 $durStatusConfig = array_merge($durStatusConfig, $decodedStatuses);
             }
+        }
+
+        $typeLabels = [];
+        $savedLabels = $sm->get('dur_type_labels');
+        if ($savedLabels) {
+            $decoded = json_decode($savedLabels, true);
+            if (is_array($decoded)) $typeLabels = $decoded;
         }
 
         require BASE_PATH . '/templates/admin/dur_schedules.php';
@@ -1811,7 +1867,11 @@ class UserController
         );
 
         Helpers::flash('success', 'Objaw awarii zaktualizowany pomyślnie.');
-        Helpers::redirect('my_failures');
+        if (($_POST['return_to'] ?? '') === 'failure_detail') {
+            Helpers::redirect('failure_detail', ['id' => $id]);
+        } else {
+            Helpers::redirect('my_failures');
+        }
     }
 
     private function redirectBack(): void

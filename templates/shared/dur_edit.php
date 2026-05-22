@@ -9,6 +9,12 @@ use App\Helpers\Auth;
 $pageTitle = 'Edytuj raport DUR';
 require BASE_PATH . '/templates/shared/header.php';
 
+$typeLabels = [];
+try {
+    $tl = (new \App\Models\SettingsModel())->get('dur_type_labels');
+    if ($tl) $typeLabels = json_decode($tl, true) ?? [];
+} catch (\Throwable $e) {}
+
 // ZMIANA 2: odczyt konfiguracji statusów z settings
 $durStatusConfig = [];
 try {
@@ -31,7 +37,7 @@ $durStatusConfig += [
   <div class="card">
     <div class="card-head">
       <span class="card-title">
-        <?= Helpers::reviewTypeLabel($review['review_type']) ?> — <?= Helpers::e($review['line_name']) ?>
+        <?= Helpers::reviewTypeLabel($review['review_type'], $typeLabels) ?> — <?= Helpers::e($review['line_name']) ?>
       </span>
     </div>
     <div class="card-body">
@@ -51,7 +57,7 @@ $durStatusConfig += [
           <div class="fg">
             <label class="flbl">Typ przeglądu</label>
             <div class="fc" style="background:#f3f4f6;color:#374151;cursor:default;">
-              <?= Helpers::reviewTypeLabel($review['review_type']) ?>
+              <?= Helpers::reviewTypeLabel($review['review_type'], $typeLabels) ?>
             </div>
             <span class="fhint">Typ przeglądu nie może być zmieniany.</span>
           </div>
