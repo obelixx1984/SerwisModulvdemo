@@ -13,6 +13,7 @@ use App\Models\{
     DictionaryModel,
     StatusModel,
     FailureModel,
+    AssignmentModel,
     MaintenanceModel,
     SettingsModel,
     SymptomModel
@@ -371,13 +372,10 @@ class FailureController
         }
 
         $user       = Auth::user();
-        // Dostęp do strony (widok): mechanik, uprawnienie 'failures' LUB zgłaszający
         $canView    = Auth::isMechanic() || Auth::hasPermission('failures');
         $isReporter = (int)($failure['reporter_user_id'] ?? 0) === (int)$user['id'];
-        // Możliwość edycji (formularze): tylko mechanik LUB uprawnienie 'statuses'
         $canEdit    = Auth::isMechanic() || Auth::hasPermission('statuses');
 
-        // Dostęp: widok LUB zgłaszający tej awarii
         if (!$canView && !$isReporter) {
             Helpers::flash('error', 'Brak uprawnień do szczegółów zgłoszenia.');
             Helpers::redirect('dashboard');
@@ -390,7 +388,16 @@ class FailureController
         $categories = (new CategoryModel())->getAll(true);
         $dictionary = (new DictionaryModel())->getActive();
 
-        // $canEdit przekazywany do szablonu — ukrywa formularze dla obserwatora
+        // ── NOWE: obsada zgłoszenia ──────────────────────────
+        $am          = new AssignmentModel();
+        $assignments = $am->getByFailure($id);
+        // Lista mechaników do wyboru (tylko rola mechanic, aktywni)
+        $mechanics   = (new UserModel())->getMechanics();
+        // ── NOWE ────────────────────────────────────────────────────
+        $isLeader    = $am->isLeader($id, (int)$user['id']);
+        $hasLeader   = !empty(array_filter($assignments, fn($a) => !empty($a['is_first'])));
+        // ────────────────────────────────────────────────────────────
+
         require BASE_PATH . '/templates/shared/failure_detail.php';
     }
 
@@ -412,13 +419,11 @@ class FailureController
             Helpers::redirect('failures');
         }
 
-        // Blokada: ten sam status
         if ($failure['status_id'] == $newStatusId) {
             Helpers::flash('error', 'Zgłoszenie ma już ten status. Wybierz inny.');
             Helpers::redirect('failure_detail', ['id' => $id]);
         }
 
-        // Blokada: zgłoszenie ze statusem końcowym (błąd 3)
         if (!empty($failure['status_is_final'])) {
             Helpers::flash('error', 'Zgłoszenie jest zamknięte — nie można zmieniać statusu.');
             Helpers::redirect('failure_detail', ['id' => $id]);
@@ -430,14 +435,14 @@ class FailureController
             Helpers::redirect('failure_detail', ['id' => $id]);
         }
 
-        // Blokada: nie można ręcznie nadać statusu startowego (błąd 4)
         if (!empty($newStatus['is_initial'])) {
-            Helpers::flash('error', 'Status startowy jest nadawany automatycznie przy tworzeniu zgłoszenia — nie można go przypisać ręcznie.');
+            Helpers::flash('error', 'Status startowy nadawany jest automatycznie.');
             Helpers::redirect('failure_detail', ['id' => $id]);
         }
 
-        // Zmiana 3: blokada statusu końcowego bez kategorii i usterki
+        // ── Walidacja przy statusie końcowym ─────────────────
         if (!empty($newStatus['is_final'])) {
+            // Kategoria i usterka
             $hasCategory = !empty($failure['category_id']);
             $hasDict     = !empty($failure['dictionary_item_id']);
             $hasOther    = !empty($failure['other_failure']);
@@ -447,9 +452,30 @@ class FailureController
                 Helpers::flash('error', 'Nie dodałeś kategorii i rodzaju awarii!!! Uzupełnij to!!!');
                 Helpers::redirect('failure_detail', ['id' => $id]);
             }
+
+            // ── NOWE: walidacja obsady ────────────────────────
+            $am          = new AssignmentModel();
+            $assignments = $am->getByFailure($id);
+            if (empty($assignments)) {
+                Helpers::flash('error', 'Brak obsady zgłoszenia!!! Przed zamknięciem potwierdź kto pracował przy naprawie.');
+                Helpers::redirect('failure_detail', ['id' => $id]);
+            }
+            // ─────────────────────────────────────────────────
         }
 
         $user = Auth::user();
+        $am   = new AssignmentModel();
+
+        // ── NOWE: auto-dodaj bieżącego użytkownika do obsady ─
+        // is_first=1 tylko gdy status poprzedni był startowy
+        $prevStatusIsInitial = !empty($failure['status_is_initial'] ?? false);
+        // Sprawdź przez join — getById daje nam status_is_final, ale nie is_initial
+        // Pobieramy aktualny status by sprawdzić is_initial
+        $currentStatus = (new StatusModel())->getById($failure['status_id']);
+        $isFirst       = !empty($currentStatus['is_initial']) && !$am->isInCrew($id, (int)$user['id']);
+        $am->addMember($id, (int)$user['id'], $user['name'], $isFirst);
+        // ─────────────────────────────────────────────────────
+
         $fm->changeStatus($id, $newStatusId, (bool)$newStatus['is_final']);
         $fm->addHistory(
             $id,
@@ -565,6 +591,145 @@ class FailureController
         $fm->addHistory($id, $user['id'], 'comment_added', null, null, $user['name'], 'Dodano komentarz');
         Helpers::flash('success', 'Komentarz dodany.');
         Helpers::redirect('failure_detail', ['id' => $id]);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // NOWE: addAssignment() — ręczne dodanie osoby do obsady
+    // ──────────────────────────────────────────────────────────────────
+    public function addAssignment(): void
+    {
+        Auth::requireMechanic();
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('failures');
+        }
+
+        $failureId = (int)($_POST['failure_id'] ?? 0);
+        $userId    = (int)($_POST['user_id'] ?? 0);
+
+        $fm      = new FailureModel();
+        $failure = $fm->getById($failureId);
+
+        if (!$failure) {
+            Helpers::redirect('failures');
+        }
+
+        if (!empty($failure['status_is_final'])) {
+            Helpers::flash('error', 'Zgłoszenie zamknięte — nie można modyfikować obsady.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+            return;
+        }
+
+        if (!$userId) {
+            Helpers::flash('error', 'Wybierz osobę z listy.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+            return;
+        }
+
+        // Sprawdź że dodawany użytkownik jest mechanikiem
+        $um      = new UserModel();
+        $addUser = $um->getById($userId);
+        if (!$addUser || $addUser['role_name'] !== 'mechanic') {
+            Helpers::flash('error', 'Do obsady można dodawać tylko osoby z rolą Mechanik.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+            return;
+        }
+
+        $am = new AssignmentModel();
+        if ($am->isInCrew($failureId, $userId)) {
+            Helpers::flash('error', Helpers::e($addUser['name']) . ' już jest w obsadzie tego zgłoszenia.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+            return;
+        }
+
+        $currentUser = Auth::user();
+
+        // Tylko prowadzący może dodawać do obsady
+        if (!$am->isLeader($failureId, (int)$currentUser['id'])) {
+            Helpers::flash('error', 'Tylko prowadzący naprawę może modyfikować obsadę.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+            return;
+        }
+
+        $am->addMember($failureId, $userId, $addUser['name'], false, (int)$currentUser['id']);
+
+        $fm->addHistory(
+            $failureId,
+            (int)$currentUser['id'],
+            'crew_added',
+            null,
+            null,
+            $currentUser['name'],
+            'Dodano do obsady: ' . $addUser['name']
+        );
+
+        Helpers::flash('success', Helpers::e($addUser['name']) . ' dodany do obsady.');
+        Helpers::redirect('failure_detail', ['id' => $failureId]);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // NOWE: removeAssignment() — usunięcie osoby z obsady
+    // ──────────────────────────────────────────────────────────────────
+    public function removeAssignment(): void
+    {
+        Auth::requireMechanic();
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('failures');
+        }
+
+        $assignId  = (int)($_POST['assignment_id'] ?? 0);
+        $failureId = (int)($_POST['failure_id'] ?? 0);
+
+        $am         = new AssignmentModel();
+        $assignment = $am->getById($assignId);
+
+        if (!$assignment || (int)$assignment['failure_id'] !== $failureId) {
+            Helpers::flash('error', 'Nie znaleziono wpisu obsady.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+            return;
+        }
+
+        // Blokada: pierwszej osoby nie można usunąć
+        if (!empty($assignment['is_first'])) {
+            Helpers::flash('error', 'Nie można usunąć prowadzącego z obsady.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+            return;
+        }
+
+        // ── NOWE: tylko prowadzący może usuwać z obsady ──────
+        $currentUser = Auth::user();
+        if (!$am->isLeader($failureId, (int)$currentUser['id'])) {
+            Helpers::flash('error', 'Tylko prowadzący naprawę może modyfikować obsadę.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+            return;
+        }
+        // ────────────────────────────────────────────────────
+
+        $fm      = new FailureModel();
+        $failure = $fm->getById($failureId);
+        if (!empty($failure['status_is_final'])) {
+            Helpers::flash('error', 'Zgłoszenie zamknięte — nie można modyfikować obsady.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+            return;
+        }
+
+        $currentUser = Auth::user();
+        $removedName = $assignment['user_name'];
+        $am->removeMember($assignId);
+
+        $fm->addHistory(
+            $failureId,
+            (int)$currentUser['id'],
+            'crew_removed',
+            null,
+            null,
+            $currentUser['name'],
+            'Usunięto z obsady: ' . $removedName
+        );
+
+        Helpers::flash('success', Helpers::e($removedName) . ' usunięty z obsady.');
+        Helpers::redirect('failure_detail', ['id' => $failureId]);
     }
 }
 
@@ -897,6 +1062,11 @@ class AdminController
         $role = $_POST['role'] ?? 'mechanic';
         $pass = $_POST['password'] ?? '';
         $active = (int)($_POST['is_active'] ?? 1);
+
+        // Jeśli e-mail pusty — wygeneruj unikalny placeholder żeby nie złamać UNIQUE KEY
+        if ($email === '') {
+            $email = $nick . '@serwis.local';
+        }
 
         if (!$nick || !$name) {
             Helpers::flash('error', 'Podaj login i imię/nazwisko.');
@@ -1666,5 +1836,24 @@ class UserController
             exit;
         }
         Helpers::redirect('dashboard');
+    }
+
+    public function myRepairs(): void
+    {
+        Auth::requireLogin();
+
+        // Tylko dla użytkowników z uprawnieniem 'statuses'
+        if (!Auth::isMechanic() && !Auth::hasPermission('statuses')) {
+            Helpers::flash('error', 'Brak uprawnień do tej sekcji.');
+            Helpers::redirect('dashboard');
+            return;
+        }
+
+        $user      = Auth::user();
+        $am        = new AssignmentModel();
+        $myRepairs = $am->getByUserId((int)$user['id']);
+        $pageTitle = 'Moje naprawy';
+
+        require BASE_PATH . '/templates/shared/my_repairs.php';
     }
 }

@@ -26,7 +26,8 @@ spl_autoload_register(function (string $class): void {
             'App\\Models\\FailureModel'         => $mdl,
             'App\\Models\\MaintenanceModel'     => $mdl,
             'App\\Models\\SettingsModel'        => $mdl,
-            'App\\Models\\RoleModel'           => $mdl,
+            'App\\Models\\RoleModel'            => $mdl,
+            'App\\Models\\AssignmentModel'      => $mdl,
             'App\\Controllers\\AuthController'    => $ctrl,
             'App\\Controllers\\PublicController'  => $ctrl,
             'App\\Controllers\\FailureController' => $ctrl,
@@ -69,6 +70,13 @@ $routes = [
     'change_password'     => ['App\\Controllers\\UserController',   'changePassword'],
     'my_failures'         => ['App\\Controllers\\UserController',   'myFailures'],
     'my_failure_edit'     => ['App\\Controllers\\UserController',   'myFailureEdit'],   // Poprawka błąd 1
+    // ─────────────────────────────────────────────────────────
+    // Obsada zgłoszenia
+    'assignment_add'    => ['App\\Controllers\\FailureController', 'addAssignment'],
+    'assignment_remove' => ['App\\Controllers\\FailureController', 'removeAssignment'],
+
+    // Moje naprawy
+    'my_repairs'        => ['App\\Controllers\\UserController',   'myRepairs'],
     // ─────────────────────────────────────────────────────────
     'dur_detail'          => ['App\\Controllers\\DurController',     'detail'],
     'admin_users'         => ['App\\Controllers\\AdminController',   'users'],

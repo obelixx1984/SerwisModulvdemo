@@ -999,6 +999,31 @@ $adminRoutes = [
       box-shadow: 0 3px 12px rgba(185, 28, 28, .4);
     }
 
+    /* ── Banner walidacji obsady (analogiczny do catNotice) ─────── */
+    #crewNotice {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 220px;
+      /* szerokość sidebara */
+      right: 0;
+      background: #0a2463;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 20px;
+      z-index: 1000;
+      text-align: center;
+      animation: slideDown .2s ease;
+    }
+
+    /* Na mobile (sidebar zwinięty do 52px) */
+    @media (max-width: 700px) {
+      crewNotice {
+        left: 52px;
+      }
+    }
+
     /* ── Line history selector ── */
     .line-sel-bar {
       display: flex;
@@ -1263,6 +1288,7 @@ $adminRoutes = [
       }
 
       #durNotice,
+      #crewNotice,
       #catNotice {
         left: 0;
       }
@@ -1290,6 +1316,7 @@ $adminRoutes = [
       }
 
       #durNotice,
+      #crewNotice,
       #catNotice {
         left: 52px;
       }
@@ -1303,6 +1330,7 @@ $adminRoutes = [
 
   <!-- Zmiana 3: banner blokady statusu końcowego — pokazywany przez JS w failure_detail.php -->
   <div id="catNotice">🚫&nbsp;&nbsp;Nie dodałeś kategorii i rodzaju awarii!!! Uzupełnij to!!!</div>
+  <div id="crewNotice">👷&nbsp;&nbsp;Brak obsady zgłoszenia!!! Przed zamknięciem potwierdź kto pracował przy naprawie.</div>
 
   <div class="app-shell">
     <nav class="sidebar">
@@ -1382,6 +1410,14 @@ $adminRoutes = [
                   </svg>
                   Moje zgłoszenia
                 </a>
+                <?php if (\App\Helpers\Auth::isMechanic() || \App\Helpers\Auth::hasPermission('statuses')): ?>
+                  <a href="<?= BASE_URL ?>/index.php?route=my_repairs">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                    </svg>
+                    Moje naprawy
+                  </a>
+                <?php endif; ?>
                 <div class="ud-sep"></div>
                 <a href="<?= BASE_URL ?>/index.php?route=logout" class="ud-logout">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

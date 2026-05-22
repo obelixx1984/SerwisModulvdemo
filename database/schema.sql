@@ -1,10 +1,7 @@
 -- ============================================================
 -- Moduł Serwis v2 — Schemat bazy danych
 -- Kompatybilny z MySQL 5.7+ / MariaDB 10.3+
--- ZMIANA: dodano kolumnę other_symptom do tabeli failures
---         (scalono z migration_other_symptom.sql)
---         Pliki install.sql i migration_other_symptom.sql
---         zostały usunięte — ten plik jest jedynym źródłem schematu.
+-- ZMIANA v2.3: dodano tabelę failure_assignments (obsada zgłoszenia)
 -- ============================================================
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -159,8 +156,6 @@ CREATE TABLE IF NOT EXISTS `failure_symptoms` (
 
 -- ────────────────────────────────────────────────────────────
 -- zgłoszenia awarii
--- ZMIANA: dodano kolumnę other_symptom po symptom_id
---         (wcześniej w migration_other_symptom.sql)
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `failures` (
     `id`                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -169,7 +164,7 @@ CREATE TABLE IF NOT EXISTS `failures` (
     `subsystem_id`        INT UNSIGNED NULL  COMMENT 'Opcjonalny podzespół linii',
     `symptom_id`          INT UNSIGNED NULL  COMMENT 'Objaw wybrany przez zgłaszającego',
     `other_symptom`       TINYINT(1)   NOT NULL DEFAULT 0
-                          COMMENT '1 = zgłaszający wybrał "Inne objawy" — opis w polu description',
+                          COMMENT '1 = zgłaszający wybrał "Inne objawy"',
     `category_id`         INT UNSIGNED NULL  COMMENT 'Rodzaj awarii — ustawia mechanik',
     `status_id`           INT UNSIGNED NOT NULL,
     `dictionary_item_id`  INT UNSIGNED NULL,
@@ -202,6 +197,30 @@ CREATE TABLE IF NOT EXISTS `failures` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
+-- obsada zgłoszenia awarii                     ← NOWE v2.3
+-- Przechowuje listę osób które pracowały przy danym zgłoszeniu.
+-- is_first=1 oznacza pierwszą osobę która zmieniła status ze
+-- startowego — tej nie można usunąć z obsady.
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `failure_assignments` (
+    `id`            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `failure_id`    INT UNSIGNED NOT NULL,
+    `user_id`       INT UNSIGNED NOT NULL,
+    `user_name`     VARCHAR(150) NOT NULL COMMENT 'Snapshot imienia w momencie dodania',
+    `is_first`      TINYINT(1)   NOT NULL DEFAULT 0
+                    COMMENT '1 = pierwsza osoba która zmieniła status ze startowego (nie można usunąć)',
+    `added_by`      INT UNSIGNED NULL     COMMENT 'Kto dodał do obsady (NULL = auto przy zmianie statusu)',
+    `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_assignment` (`failure_id`, `user_id`) COMMENT 'Jeden wpis per osoba per zgłoszenie',
+    KEY `idx_assign_failure` (`failure_id`),
+    KEY `idx_assign_user`    (`user_id`),
+    CONSTRAINT `fk_assign_failure` FOREIGN KEY (`failure_id`) REFERENCES `failures` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_assign_user`    FOREIGN KEY (`user_id`)    REFERENCES `users` (`id`)    ON DELETE CASCADE,
+    CONSTRAINT `fk_assign_added`   FOREIGN KEY (`added_by`)   REFERENCES `users` (`id`)    ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- ────────────────────────────────────────────────────────────
 -- komentarze do zgłoszeń
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `failure_comments` (
@@ -226,7 +245,7 @@ CREATE TABLE IF NOT EXISTS `failure_history` (
     `failure_id`    INT UNSIGNED NOT NULL,
     `user_id`       INT UNSIGNED NULL,
     `actor_name`    VARCHAR(150) NOT NULL DEFAULT 'System' COMMENT 'Wyświetlana nazwa aktora',
-    `action`        VARCHAR(50)  NOT NULL COMMENT 'created|status_changed|comment_added|edited',
+    `action`        VARCHAR(50)  NOT NULL COMMENT 'created|status_changed|comment_added|edited|crew_added|crew_removed',
     `old_status_id` INT UNSIGNED NULL,
     `new_status_id` INT UNSIGNED NULL,
     `note`          TEXT         NULL,
@@ -293,23 +312,22 @@ CREATE TABLE IF NOT EXISTS `maintenance_reviews` (
     `performed_by`        INT UNSIGNED NOT NULL,
     `review_type`         ENUM(
         'weekly', 'monthly', 'quarterly', 'biannual', 'annual', 'ad_hoc'
-    ) NOT NULL,
-    `review_date`         DATE         NOT NULL,
-    `duration_minutes`    INT UNSIGNED NULL,
-    `activities`          TEXT         NOT NULL,
-    `parts_used`          TEXT         NULL,
-    `notes`               TEXT         NULL,
-    `status`              ENUM('completed', 'partial', 'interrupted') NOT NULL DEFAULT 'completed',
-    `next_review_date`    DATE         NULL,
-    `created_at`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    ) NOT NULL DEFAULT 'monthly',
+    `review_date`       DATE         NOT NULL,
+    `duration_minutes`  INT UNSIGNED NULL,
+    `activities`        TEXT         NOT NULL,
+    `parts_used`        TEXT         NULL,
+    `notes`             TEXT         NULL,
+    `status`            ENUM('completed', 'partial', 'interrupted') NOT NULL DEFAULT 'completed',
+    `next_review_date`  DATE         NULL,
+    `created_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_rev_line`     (`production_line_id`),
-    KEY `idx_rev_date`     (`review_date`),
-    KEY `idx_rev_type`     (`review_type`),
-    KEY `idx_rev_performer`(`performed_by`),
+    KEY `idx_rev_line`      (`production_line_id`),
+    KEY `idx_rev_date`      (`review_date`),
+    KEY `idx_rev_performer` (`performed_by`),
     CONSTRAINT `fk_rev_line`      FOREIGN KEY (`production_line_id`) REFERENCES `production_lines` (`id`),
-    CONSTRAINT `fk_rev_subsystem` FOREIGN KEY (`subsystem_id`)       REFERENCES `line_subsystems` (`id`)      ON DELETE SET NULL,
+    CONSTRAINT `fk_rev_subsystem` FOREIGN KEY (`subsystem_id`)       REFERENCES `line_subsystems` (`id`)       ON DELETE SET NULL,
     CONSTRAINT `fk_rev_template`  FOREIGN KEY (`template_id`)        REFERENCES `maintenance_templates` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_rev_schedule`  FOREIGN KEY (`schedule_id`)        REFERENCES `maintenance_schedules` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_rev_performer` FOREIGN KEY (`performed_by`)       REFERENCES `users` (`id`)
@@ -319,13 +337,54 @@ CREATE TABLE IF NOT EXISTS `maintenance_reviews` (
 -- ustawienia systemowe
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `settings` (
-    `id`         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-    `skey`       VARCHAR(100)  NOT NULL,
-    `svalue`     TEXT          NULL,
-    `label`      VARCHAR(200)  NULL,
-    `updated_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `skey`       VARCHAR(100) NOT NULL,
+    `svalue`     TEXT         NULL,
+    `label`      VARCHAR(200) NOT NULL,
+    `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_settings_key` (`skey`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- ────────────────────────────────────────────────────────────
+-- MIGRACJE dla istniejących baz danych
+-- Pomiń przy nowej instalacji (schema już zawiera te kolumny).
+-- ────────────────────────────────────────────────────────────
+
+-- Migracja v2 → v2.1 (symptom_id, other_failure, mechanic_note):
+-- ALTER TABLE `failures`
+--     ADD COLUMN IF NOT EXISTS `symptom_id`    INT UNSIGNED NULL AFTER `subsystem_id`,
+--     ADD COLUMN IF NOT EXISTS `other_symptom` TINYINT(1) NOT NULL DEFAULT 0 AFTER `symptom_id`,
+--     ADD COLUMN IF NOT EXISTS `other_failure` TINYINT(1) NOT NULL DEFAULT 0 AFTER `dictionary_item_id`,
+--     ADD COLUMN IF NOT EXISTS `mechanic_note` TEXT NULL AFTER `other_failure`,
+--     MODIFY COLUMN `category_id` INT UNSIGNED NULL;
+
+-- Migracja v2.1 → v2.2 (reporter_user_id):
+-- ALTER TABLE `failures`
+--     ADD COLUMN IF NOT EXISTS `reporter_user_id` INT UNSIGNED NULL AFTER `reporter_name`;
+-- ALTER TABLE `failures`
+--     ADD KEY IF NOT EXISTS `idx_failures_reporter_user` (`reporter_user_id`);
+-- ALTER TABLE `failures`
+--     ADD CONSTRAINT `fk_failures_reporter_user`
+--     FOREIGN KEY (`reporter_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+-- Migracja v2.2 → v2.3 (failure_assignments — obsada zgłoszenia):
+-- CREATE TABLE IF NOT EXISTS `failure_assignments` (
+--     `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+--     `failure_id` INT UNSIGNED NOT NULL,
+--     `user_id`    INT UNSIGNED NOT NULL,
+--     `user_name`  VARCHAR(150) NOT NULL,
+--     `is_first`   TINYINT(1)   NOT NULL DEFAULT 0,
+--     `added_by`   INT UNSIGNED NULL,
+--     `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+--     PRIMARY KEY (`id`),
+--     UNIQUE KEY `uq_assignment` (`failure_id`, `user_id`),
+--     KEY `idx_assign_failure` (`failure_id`),
+--     KEY `idx_assign_user`    (`user_id`),
+--     CONSTRAINT `fk_assign_failure` FOREIGN KEY (`failure_id`) REFERENCES `failures` (`id`) ON DELETE CASCADE,
+--     CONSTRAINT `fk_assign_user`    FOREIGN KEY (`user_id`)    REFERENCES `users` (`id`)    ON DELETE CASCADE,
+--     CONSTRAINT `fk_assign_added`   FOREIGN KEY (`added_by`)   REFERENCES `users` (`id`)    ON DELETE SET NULL
+-- ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
