@@ -1322,6 +1322,32 @@ $adminRoutes = [
       }
     }
   </style>
+  
+  <?php if ($user): ?>
+    <script>
+      (function() {
+        var timeout = <?= SESSION_IDLE_TIMEOUT ?> * 1000; // sekundy → milisekundy
+        var timer;
+
+        function resetTimer() {
+          clearTimeout(timer);
+          timer = setTimeout(function() {
+            window.location.href = '<?= BASE_URL ?>/index.php?route=logout';
+          }, timeout);
+        }
+
+        // Resetuj licznik przy każdej aktywności użytkownika
+        ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'].forEach(function(evt) {
+          document.addEventListener(evt, resetTimer, {
+            passive: true
+          });
+        });
+
+        resetTimer(); // uruchom licznik od razu
+      })();
+    </script>
+  <?php endif; ?>
+
 </head>
 
 <body>

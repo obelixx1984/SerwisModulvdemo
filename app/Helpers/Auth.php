@@ -9,13 +9,22 @@ class Auth
         if (session_status() === PHP_SESSION_NONE) {
             session_name(SESSION_NAME);
             session_set_cookie_params([
-                'lifetime' => SESSION_LIFETIME,
+                'lifetime' => 0,
                 'path'     => '/',
                 'secure'   => false,
                 'httponly' => true,
                 'samesite' => 'Lax',
             ]);
             session_start();
+
+            // Wyloguj po bezczynności
+            if (!empty($_SESSION['last_activity'])) {
+                if (time() - $_SESSION['last_activity'] > SESSION_IDLE_TIMEOUT) {
+                    self::logout();
+                    Helpers::redirect('login');
+                }
+            }
+            $_SESSION['last_activity'] = time();
         }
     }
 

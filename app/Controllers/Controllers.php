@@ -297,23 +297,8 @@ class FailureController
         // Średni czas naprawy dla wszystkich linii (zachowany do ewentualnego użycia)
         $avgRepairAll = $fm->getGlobalAvgRepairTime();
 
-        // ZMIANA 3: ilość awarii w bieżącym miesiącu + polska nazwa miesiąca
-        $monthlyCount = $fm->getMonthlyFailureCount();
-        $polishMonths = [
-            1  => 'Styczniu',
-            2  => 'Lutym',
-            3  => 'Marcu',
-            4  => 'Kwietniu',
-            5  => 'Maju',
-            6  => 'Czerwcu',
-            7  => 'Lipcu',
-            8  => 'Sierpniu',
-            9  => 'Wrześniu',
-            10 => 'Październiku',
-            11 => 'Listopadzie',
-            12 => 'Grudniu',
-        ];
-        $currentMonthName = $polishMonths[(int)date('n')];
+        // Awarie z ostatnich 30 dni
+        $last30Count = $fm->getLast30DaysCount();
 
         // Zlicz per status
         $byStatus = [];
@@ -396,6 +381,7 @@ class FailureController
         // ── NOWE ────────────────────────────────────────────────────
         $isLeader    = $am->isLeader($id, (int)$user['id']);
         $hasLeader   = !empty(array_filter($assignments, fn($a) => !empty($a['is_first'])));
+        $symptoms    = (new SymptomModel())->getActive();  // ← DODAJ
         // ────────────────────────────────────────────────────────────
 
         require BASE_PATH . '/templates/shared/failure_detail.php';

@@ -14,6 +14,9 @@ define('APP_DEBUG',        true);
 define('APP_TIMEZONE',     'Europe/Warsaw');
 define('SESSION_NAME',     'modul_serwis_sess');
 define('SESSION_LIFETIME', 7200);
+// Timeout bezczynności po stronie serwera (sekundy)
+define('SESSION_IDLE_TIMEOUT', 300); //5 minut (300)
+
 define('RECORDS_PER_PAGE', 25);
 define('DUR_WARNING_DAYS', 7);
 

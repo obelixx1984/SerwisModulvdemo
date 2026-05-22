@@ -821,13 +821,12 @@ class FailureModel extends BaseModel
     }
 
     /** ZMIANA 3: Zlicz awarie zgłoszone w bieżącym miesiącu i roku */
-    public function getMonthlyFailureCount(): int
+    public function getLast30DaysCount(): int
     {
         $row = $this->fetchOne(
             "SELECT COUNT(*) AS cnt
-             FROM failures
-             WHERE YEAR(created_at)  = YEAR(NOW())
-               AND MONTH(created_at) = MONTH(NOW())"
+         FROM failures
+         WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
         );
         return (int)($row['cnt'] ?? 0);
     }

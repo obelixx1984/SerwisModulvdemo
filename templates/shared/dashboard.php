@@ -28,7 +28,7 @@ require BASE_PATH . '/templates/shared/header.php';
   <div class="stat-card"><div class="stat-val sv-a"><?= (int)($stats['progress_count'] ?? 0) ?></div><div class="stat-lbl">W trakcie</div></div>
   <div class="stat-card"><div class="stat-val sv-b"><?= (int)($stats['open_count'] ?? 0) ?></div><div class="stat-lbl">Otwarte łącznie</div></div>
   <?php /* ZMIANA 3: karta "Ilość awarii w [miesiąc]" zamiast "Śr. czas naprawy" */ ?>
-  <div class="stat-card"><div class="stat-val sv-v"><?= (int)$monthlyCount ?></div><div class="stat-lbl">Awarii w <?= Helpers::e($currentMonthName) ?></div></div>
+  <div class="stat-card"><div class="stat-val sv-v"><?= (int)$last30Count ?></div><div class="stat-lbl">Awarii / ostatnie 30 dni</div></div>
 </div>
 
 <div class="g2">
