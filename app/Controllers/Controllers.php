@@ -15,6 +15,7 @@ use App\Models\{
     FailureModel,
     AssignmentModel,
     MaintenanceModel,
+    ScheduleNoteModel,
     SettingsModel,
     SymptomModel
 };
@@ -292,6 +293,13 @@ class FailureController
         $recent    = $fm->getList([], 6, 0);
         $durWarnDays = max(1, (int)((new \App\Models\SettingsModel())->get('dur_warning_days') ?? DUR_WARNING_DAYS));
         $upcoming    = $mm->getUpcomingSchedules($durWarnDays);
+
+        $noteCounts = [];
+        if (!empty($upcoming)) {
+            $scheduleIds = array_column($upcoming, 'id');
+            $noteCounts  = (new \App\Models\ScheduleNoteModel())->countActiveGrouped($scheduleIds);
+        }
+
         $statuses  = (new StatusModel())->getAll(true);
 
         // Średni czas naprawy dla wszystkich linii (zachowany do ewentualnego użycia)
@@ -720,7 +728,13 @@ class DurController
 {
     public function list(): void
     {
-        // DUR dostepny publicznie (tylko odczyt)
+        Auth::requireLogin();
+        if (!Auth::hasPermission('dur') && !Auth::isMechanic()) {
+            Helpers::flash('error', 'Brak uprawnień do przeglądów DUR.');
+            Helpers::redirect('dashboard');
+            return;
+        }
+
         $mm      = new MaintenanceModel();
         $filters = [
             'line_id' => (int)($_GET['line_id'] ?? 0) ?: null,
@@ -728,17 +742,24 @@ class DurController
             'type'    => $_GET['type'] ?? null,
         ];
         $page    = max(1, (int)($_GET['page'] ?? 1));
-        $perPage = 18;  // ← stały limit 18 raportów na stronę
+        $perPage = 18;
 
         $activeFilters = array_filter($filters);
-        $total   = $mm->countAllReviews($activeFilters);          // ← nowa metoda
+        $total   = $mm->countAllReviews($activeFilters);
         $pager   = Helpers::paginate($total, $page, $perPage);
         $reviews = $mm->getAllReviews($activeFilters, $pager['per_page'], $pager['offset']);
 
-        $durWarnDays = max(1, (int)((new \App\Models\SettingsModel())->get('dur_warning_days') ?? DUR_WARNING_DAYS));
+        $durWarnDays = max(1, (int)((new SettingsModel())->get('dur_warning_days') ?? DUR_WARNING_DAYS));
         $upcoming    = $mm->getUpcomingSchedules($durWarnDays);
         $lines       = (new ProductionLineModel())->getAll(true);
         $templates   = $mm->getTemplates();
+
+        // Liczba uwag per harmonogram
+        $noteCounts = [];
+        if (!empty($upcoming)) {
+            $scheduleIds = array_column($upcoming, 'id');
+            $noteCounts  = (new ScheduleNoteModel())->countActiveGrouped($scheduleIds);
+        }
 
         require BASE_PATH . '/templates/shared/dur_list.php';
     }
@@ -749,12 +770,25 @@ class DurController
         $lines     = (new ProductionLineModel())->getAll(true);
         $templates = (new MaintenanceModel())->getTemplates();
 
-        // Odczytaj aktywne typy przeglądów z ustawień
         $activeTypes = ['weekly', 'monthly', 'quarterly', 'biannual', 'annual', 'ad_hoc'];
         $saved = (new SettingsModel())->get('dur_active_review_types');
         if ($saved) {
             $decoded = json_decode($saved, true);
             if (is_array($decoded) && $decoded) $activeTypes = $decoded;
+        }
+
+        // Uwagi dla preselected linii i typu
+        $scheduleNotes = [];
+        $preSchedule   = null;
+        $preLineId     = (int)($_GET['line_id'] ?? 0);
+        $preType       = $_GET['review_type'] ?? '';
+
+        if ($preLineId && $preType) {
+            $mm          = new MaintenanceModel();
+            $preSchedule = $mm->findScheduleByLineAndType($preLineId, $preType);
+            if ($preSchedule) {
+                $scheduleNotes = (new ScheduleNoteModel())->getActiveBySchedule($preSchedule['id']);
+            }
         }
 
         require BASE_PATH . '/templates/shared/dur_form.php';
@@ -818,11 +852,144 @@ class DurController
                 );
             }
             $mm->updateScheduleNextDate($schedule['id'], $updatedNextDate);
-        }
-        // ─────────────────────────────────────────────────────────
 
+            // Archiwizuj uwagi — przypisz do właśnie zapisanego raportu
+            (new ScheduleNoteModel())->archiveForReview($schedule['id'], $id);
+        }
+        // ─────────────────...
         Helpers::flash('success', 'Raport DUR zapisany pomyślnie.');
         Helpers::redirect('dur_detail', ['id' => $id]);
+    }
+
+    public function scheduleNoteAdd(): void
+    {
+        Auth::requireLogin();
+        if (!Auth::hasPermission('dur') && !Auth::isMechanic()) {
+            Helpers::flash('error', 'Brak uprawnień.');
+            Helpers::redirect('dur');
+            return;
+        }
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        $scheduleId = (int)($_POST['schedule_id'] ?? 0);
+        $note       = trim($_POST['note'] ?? '');
+
+        if (!$scheduleId || !$note) {
+            Helpers::flash('error', 'Wpisz treść uwagi.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        $schedule = (new MaintenanceModel())->getScheduleById($scheduleId);
+        if (!$schedule) {
+            Helpers::flash('error', 'Harmonogram nie istnieje.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        $user = Auth::user();
+        (new ScheduleNoteModel())->add($scheduleId, (int)$user['id'], $user['name'], $note);
+
+        Helpers::flash('success', 'Uwaga została dodana.');
+        $returnTo = $_POST['return_to'] ?? 'dur';
+        Helpers::redirect(in_array($returnTo, ['dur', 'dashboard']) ? $returnTo : 'dur');
+    }
+
+    public function scheduleNoteEdit(): void
+    {
+        Auth::requireLogin();
+        if (!Auth::hasPermission('dur') && !Auth::isMechanic()) {
+            Helpers::flash('error', 'Brak uprawnień.');
+            Helpers::redirect('dur');
+            return;
+        }
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        $noteId = (int)($_POST['note_id'] ?? 0);
+        $note   = trim($_POST['note'] ?? '');
+
+        if (!$noteId || !$note) {
+            Helpers::flash('error', 'Nieprawidłowe dane.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        $nm       = new ScheduleNoteModel();
+        $existing = $nm->getById($noteId);
+
+        if (!$existing) {
+            Helpers::flash('error', 'Uwaga nie istnieje.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        $user = Auth::user();
+        if ((int)$existing['user_id'] !== (int)$user['id']) {
+            Helpers::flash('error', 'Możesz edytować tylko swoje uwagi.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        if (!empty($existing['is_archived'])) {
+            Helpers::flash('error', 'Nie można edytować zarchiwizowanej uwagi.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        $nm->update($noteId, $note);
+        Helpers::flash('success', 'Uwaga zaktualizowana.');
+        $returnTo = $_POST['return_to'] ?? 'dur';
+        Helpers::redirect(in_array($returnTo, ['dur', 'dashboard']) ? $returnTo : 'dur');
+    }
+
+    public function scheduleNoteDelete(): void
+    {
+        Auth::requireLogin();
+        if (!Auth::hasPermission('dur') && !Auth::isMechanic()) {
+            Helpers::flash('error', 'Brak uprawnień.');
+            Helpers::redirect('dur');
+            return;
+        }
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        $noteId   = (int)($_POST['note_id'] ?? 0);
+        $nm       = new ScheduleNoteModel();
+        $existing = $nm->getById($noteId);
+
+        if (!$existing) {
+            Helpers::redirect('dur');
+            return;
+        }
+
+        $user = Auth::user();
+        if ((int)$existing['user_id'] !== (int)$user['id']) {
+            Helpers::flash('error', 'Możesz usuwać tylko swoje uwagi.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        if (!empty($existing['is_archived'])) {
+            Helpers::flash('error', 'Nie można usunąć zarchiwizowanej uwagi.');
+            Helpers::redirect('dur');
+            return;
+        }
+
+        $nm->delete($noteId);
+        Helpers::flash('success', 'Uwaga usunięta.');
+        $returnTo = $_POST['return_to'] ?? 'dur';
+        Helpers::redirect(in_array($returnTo, ['dur', 'dashboard']) ? $returnTo : 'dur');
     }
 
     public function detail(): void

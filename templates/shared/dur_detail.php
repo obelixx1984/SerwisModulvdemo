@@ -7,6 +7,8 @@ use App\Helpers\Helpers;
 $pageTitle = 'Szczegóły DUR';
 require BASE_PATH . '/templates/shared/header.php';
 
+$archivedNotes = (new \App\Models\ScheduleNoteModel())->getArchivedByReview((int)$review['id']);
+
 // ZMIANA 2: odczyt konfiguracji statusów z settings
 $durStatusConfig = [];
 try {
@@ -92,6 +94,36 @@ $canEditDur   = \App\Helpers\Auth::hasPermission('dur') && $isAuthor;
     <div class="alert alert-w" style="align-self:start;">⚠ <strong>Uwagi:</strong> <?= Helpers::e($review['notes']) ?></div>
   <?php endif; ?>
 </div>
+
+<?php if (!empty($archivedNotes)): ?>
+  <div class="card mb2" style="border-left:3px solid #7c3aed;">
+    <div class="card-head">
+      <span class="card-title" style="color:#4c1d95;">
+        📝 Uwagi przed przeglądem (<?= count($archivedNotes) ?>)
+      </span>
+      <span class="badge" style="background:#f5f3ff;color:#4c1d95;border:1px solid #c4b5fd;">
+        Archiwum
+      </span>
+    </div>
+    <div class="card-body" style="padding:10px 14px;">
+      <div class="muted fs-sm" style="margin-bottom:10px;">
+        Uwagi dodane przez użytkowników przed wykonaniem tego przeglądu.
+      </div>
+      <?php foreach ($archivedNotes as $n): ?>
+        <div style="padding:8px 10px;background:#f8fafc;border:1px solid #e5e7eb;
+                  border-radius:7px;margin-bottom:8px;font-size:13px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span class="fw6"><?= \App\Helpers\Helpers::e($n['user_name']) ?></span>
+            <span class="muted" style="font-size:11px;"><?= substr($n['created_at'], 0, 16) ?></span>
+          </div>
+          <div style="white-space:pre-wrap;word-break:break-word;">
+            <?= nl2br(\App\Helpers\Helpers::e($n['note'])) ?>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+<?php endif; ?>
 
 <div class="g2">
   <div class="card">

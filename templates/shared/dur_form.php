@@ -6,6 +6,10 @@ $pageTitle = 'Nowy raport DUR';
 require BASE_PATH . '/templates/shared/header.php';
 
 $subsystemsJs = [];
+
+$scheduleNotes = $scheduleNotes ?? [];
+$preSchedule   = $preSchedule   ?? null;
+
 foreach ($lines as $l) {
   $subs = [];
   if (!empty($l['subsystems_str'])) {
@@ -30,10 +34,13 @@ foreach ($lines as $l) {
       <div class="g2">
         <div class="fg">
           <label class="flbl">Linia produkcyjna <span class="req">*</span></label>
-          <select name="production_line_id" class="fc" required id="durLineSel" onchange="updateDurSubs(this.value)">
+          <select name="production_line_id" class="fc" required id="durLineSel" onchange="updateDurSubs(this.value); reloadForNotes()">
             <option value="">— Wybierz linię —</option>
             <?php foreach ($lines as $l): ?>
-              <option value="<?= $l['id'] ?>"><?= Helpers::e($l['name']) ?></option>
+              <option value="<?= $l['id'] ?>"
+                <?= (int)$l['id'] === (int)($_GET['line_id'] ?? 0) ? 'selected' : '' ?>>
+                <?= Helpers::e($l['name']) ?>
+              </option>
             <?php endforeach; ?>
           </select>
         </div>
@@ -63,18 +70,41 @@ foreach ($lines as $l) {
                 if (isset($allTypes[$k])) $allTypes[$k] = $v;
               }
             }
-          } catch (\Throwable $e) {}
+          } catch (\Throwable $e) {
+          }
           ?>
-          <select name="review_type" class="fc" required>
+          <select name="review_type" class="fc" required id="reviewTypeSel" onchange="reloadForNotes()">
             <?php foreach ($allTypes as $key => $label): ?>
               <?php if (in_array($key, $activeTypes)): ?>
-                <option value="<?= $key ?>" <?= $key === 'monthly' ? 'selected' : '' ?>>
+                <option value="<?= $key ?>"
+                  <?= ($key === ($_GET['review_type'] ?? 'monthly')) ? 'selected' : '' ?>>
                   <?= $label ?>
                 </option>
               <?php endif; ?>
             <?php endforeach; ?>
           </select>
         </div>
+
+        <?php if ($preSchedule && !empty($scheduleNotes)): ?>
+          <div class="alert" style="background:#f5f3ff;border:1px solid #c4b5fd;
+                             border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+            <div class="fw6 fs-sm" style="color:#4c1d95;margin-bottom:8px;">
+              📝 Uwagi do tego przeglądu (<?= count($scheduleNotes) ?>):
+            </div>
+            <?php foreach ($scheduleNotes as $sn): ?>
+              <div style="padding:6px 0;border-bottom:1px solid #e9d5ff;font-size:13px;">
+                <span class="fw6"><?= \App\Helpers\Helpers::e($sn['user_name']) ?>:</span>
+                <span style="margin-left:6px;"><?= nl2br(\App\Helpers\Helpers::e($sn['note'])) ?></span>
+                <span class="muted" style="font-size:11px;margin-left:8px;">
+                  <?= substr($sn['created_at'], 0, 16) ?>
+                </span>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php elseif ($preSchedule): ?>
+          <div class="muted fs-sm" style="margin-bottom:10px;">📝 Brak uwag do wybranego przeglądu.</div>
+        <?php endif; ?>
+
         <div class="fg">
           <label class="flbl">Data przeglądu <span class="req">*</span></label>
           <input name="review_date" type="date" class="fc" value="<?= date('Y-m-d') ?>" required>
@@ -166,6 +196,18 @@ foreach ($lines as $l) {
     var cl = opt ? opt.dataset.checklist : '';
     var ta = document.getElementById('durActivities');
     if (cl) ta.value = cl;
+  }
+
+  function reloadForNotes() {
+    var lineId = document.getElementById('durLineSel') ?
+      document.getElementById('durLineSel').value : '';
+    var typeSel = document.getElementById('reviewTypeSel');
+    var type = typeSel ? typeSel.value : '';
+    if (lineId && type) {
+      window.location.href = '<?= BASE_URL ?>/index.php?route=dur_add' +
+        '&line_id=' + encodeURIComponent(lineId) +
+        '&review_type=' + encodeURIComponent(type);
+    }
   }
 </script>
 <?php require BASE_PATH . '/templates/shared/footer.php'; ?>
