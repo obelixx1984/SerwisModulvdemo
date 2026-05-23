@@ -3,18 +3,19 @@
 // ZMIANA: label "Rekordów na stronę" → "Ilość rekordów na stronie z historią linii" + opis
 
 use App\Helpers\Helpers;
+
 $pageTitle = 'Ustawienia systemu';
 require BASE_PATH . '/templates/shared/header.php';
 ?>
 
 <div class="atabs mb2">
-  <a href="<?= BASE_URL ?>/index.php?route=admin_users"      class="atab">Użytkownicy</a>
-  <a href="<?= BASE_URL ?>/index.php?route=admin_lines"      class="atab">Linie i podzespoły</a>
-  <a href="<?= BASE_URL ?>/index.php?route=admin_statuses"   class="atab">Statusy</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_users" class="atab">Użytkownicy</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_lines" class="atab">Linie i podzespoły</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_statuses" class="atab">Statusy</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_dictionary" class="atab">Słownik awarii</a>
-  <a href="<?= BASE_URL ?>/index.php?route=admin_symptoms"   class="atab">Objawy awarii</a>
-  <a href="<?= BASE_URL ?>/index.php?route=admin_dur_tmpl"   class="atab v">Szablony DUR</a>
-  <a href="<?= BASE_URL ?>/index.php?route=admin_dur_sched"  class="atab v">Harmonogram DUR</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_symptoms" class="atab">Objawy awarii</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_dur_tmpl" class="atab v">Szablony DUR</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_dur_sched" class="atab v">Harmonogram DUR</a>
   <button class="atab active" data-tab="settings">Ustawienia</button>
 </div>
 
@@ -45,7 +46,7 @@ require BASE_PATH . '/templates/shared/header.php';
       <div class="fg">
         <label class="flbl">Ilość rekordów na stronie z historią linii</label>
         <input class="fc" type="number" name="records_per_page" min="5" max="200" style="width:100px;"
-               value="<?= Helpers::e($settings['records_per_page']['svalue'] ?? '25') ?>">
+          value="<?= Helpers::e($settings['records_per_page']['svalue'] ?? '25') ?>">
         <span class="fhint">
           Maksymalna liczba zgłoszeń widocznych na jednej stronie w historii linii
           (<a href="<?= BASE_URL ?>/index.php?route=line_history" style="color:#0a2463;">Historia linii</a>).
@@ -56,8 +57,19 @@ require BASE_PATH . '/templates/shared/header.php';
       <div class="fg">
         <label class="flbl">Ostrzeżenie DUR (dni przed terminem)</label>
         <input class="fc" type="number" name="dur_warning_days" min="1" max="60" style="width:100px;"
-               value="<?= Helpers::e($settings['dur_warning_days']['svalue'] ?? '7') ?>">
+          value="<?= Helpers::e($settings['dur_warning_days']['svalue'] ?? '7') ?>">
         <span class="fhint">Harmonogram DUR z terminem w ciągu tych dni będzie widoczny na Pulpicie</span>
+      </div>
+
+      <div class="fg">
+        <label class="flbl">Czas bezczynności przed wylogowaniem (minuty)</label>
+        <input class="fc" type="number" name="session_idle_timeout" min="0" max="480"
+          style="width:100px;"
+          value="<?= Helpers::e($settings['session_idle_timeout']['svalue'] ?? '5') ?>">
+        <span class="fhint">
+          Po ilu minutach braku aktywności użytkownik zostanie wylogowany.
+          Wpisz <strong>0</strong> aby wyłączyć. Zakres: 0–480 minut.
+        </span>
       </div>
 
       <div class="sep"></div>

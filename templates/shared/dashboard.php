@@ -1,6 +1,13 @@
 <?php
 use App\Helpers\Helpers;
 $pageTitle = 'Pulpit';
+
+$typeLabels = [];
+try {
+    $tl = (new \App\Models\SettingsModel())->get('dur_type_labels');
+    if ($tl) $typeLabels = json_decode($tl, true) ?? [];
+} catch (\Throwable $e) {}
+
 require BASE_PATH . '/templates/shared/header.php';
 ?>
 <div class="sh">
@@ -16,7 +23,7 @@ require BASE_PATH . '/templates/shared/header.php';
     $bl = $dl <= 0 ? 'zaległy!' : 'za '.$dl.' dni';
   ?>
   <div class="dur-up-item">
-    <span><?= Helpers::e($u['line_name']) ?> — <?= Helpers::reviewTypeLabel($u['review_type']) ?></span>
+    <span><?= Helpers::e($u['line_name']) ?> — <?= Helpers::reviewTypeLabel($u['review_type'], $typeLabels) ?></span>
     <span class="badge" style="background:<?= $bc ?>;color:#fff;"><?= $bl ?></span>
   </div>
   <?php endforeach; ?>

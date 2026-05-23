@@ -7,9 +7,10 @@ use App\Helpers\Helpers;
 
 $typeLabels = [];
 try {
-    $tl = (new \App\Models\SettingsModel())->get('dur_type_labels');
-    if ($tl) $typeLabels = json_decode($tl, true) ?? [];
-} catch (\Throwable $e) {}
+  $tl = (new \App\Models\SettingsModel())->get('dur_type_labels');
+  if ($tl) $typeLabels = json_decode($tl, true) ?? [];
+} catch (\Throwable $e) {
+}
 
 $pageTitle = 'Historia linii';
 require BASE_PATH . '/templates/shared/header.php';
@@ -28,9 +29,9 @@ require BASE_PATH . '/templates/shared/header.php';
       <?php endforeach; ?>
     </select>
     <select name="days" class="fc" style="width:auto;font-size:12px;" onchange="this.form.submit()">
-      <option value="7"   <?= $days == 7   ? 'selected' : '' ?>>7 dni</option>
-      <option value="30"  <?= $days == 30  ? 'selected' : '' ?>>30 dni</option>
-      <option value="90"  <?= $days == 90  ? 'selected' : '' ?>>90 dni</option>
+      <option value="7" <?= $days == 7   ? 'selected' : '' ?>>7 dni</option>
+      <option value="30" <?= $days == 30  ? 'selected' : '' ?>>30 dni</option>
+      <option value="90" <?= $days == 90  ? 'selected' : '' ?>>90 dni</option>
       <option value="365" <?= $days == 365 ? 'selected' : '' ?>>365 dni</option>
     </select>
   </form>
@@ -93,11 +94,10 @@ require BASE_PATH . '/templates/shared/header.php';
               <?php foreach ($failures as $f): ?>
                 <tr<?= empty($f['closed_at']) ? ' style="background:#fffbeb;"' : '' ?>>
                   <td class="mono fw6 fs-sm" style="color:#0a2463;">
-                    <?php if (\App\Helpers\Auth::isMechanic() || \App\Helpers\Auth::hasPermission('failures')): ?>
-                      <a href="<?= BASE_URL ?>/index.php?route=failure_detail&id=<?= $f['id'] ?>"><?= Helpers::e($f['ticket_number']) ?></a>
-                    <?php else: ?>
+                    <a href="<?= BASE_URL ?>/index.php?route=failure_detail&id=<?= $f['id'] ?>"
+                      style="color:#0a2463;text-decoration:none;">
                       <?= Helpers::e($f['ticket_number']) ?>
-                    <?php endif; ?>
+                    </a>
                   </td>
                   <td class="muted fs-sm"><?= Helpers::formatDateOnly($f['created_at']) ?></td>
                   <?php if (!empty($currentLine['subsystems_str'])): ?>
@@ -114,8 +114,8 @@ require BASE_PATH . '/templates/shared/header.php';
                     <?php endif; ?>
                   </td>
                   <td><?= Helpers::statusBadge($f['status_label'], $f['status_color']) ?></td>
-                </tr>
-              <?php endforeach; ?>
+                  </tr>
+                <?php endforeach; ?>
             </tbody>
           </table>
         </div>
@@ -123,10 +123,10 @@ require BASE_PATH . '/templates/shared/header.php';
         <?php /* ZMIANA: paginacja pod tabelą zgłoszeń */ ?>
         <?php if (!empty($pager) && $pager['total_pages'] > 1): ?>
           <?php
-            // Buduj bazowy URL zachowując line_id i days
-            $baseUrl = BASE_URL . '/index.php?route=line_history'
-              . '&line_id=' . $lineId
-              . '&days='    . $days;
+          // Buduj bazowy URL zachowując line_id i days
+          $baseUrl = BASE_URL . '/index.php?route=line_history'
+            . '&line_id=' . $lineId
+            . '&days='    . $days;
           ?>
           <div style="padding:10px 16px;border-top:1px solid #f3f4f6;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
             <?php if ($pager['has_prev']): ?>
@@ -136,28 +136,28 @@ require BASE_PATH . '/templates/shared/header.php';
             <?php endif; ?>
 
             <?php
-              // Pokaż numery stron (max 7 — z elipsą dla długich list)
-              $cp    = $pager['current_page'];
-              $tp    = $pager['total_pages'];
-              $pages = [];
-              if ($tp <= 7) {
-                  $pages = range(1, $tp);
-              } else {
-                  $pages = [1];
-                  if ($cp > 3)       $pages[] = '…';
-                  for ($i = max(2, $cp - 1); $i <= min($tp - 1, $cp + 1); $i++) $pages[] = $i;
-                  if ($cp < $tp - 2) $pages[] = '…';
-                  $pages[] = $tp;
-              }
-              foreach ($pages as $p):
-                if ($p === '…'): ?>
-                  <span class="muted" style="padding:0 4px;">…</span>
-                <?php elseif ($p == $cp): ?>
-                  <span class="btn btn-sm btn-p" style="cursor:default;"><?= $p ?></span>
-                <?php else: ?>
-                  <a href="<?= $baseUrl ?>&page=<?= $p ?>" class="btn btn-sm"><?= $p ?></a>
-                <?php endif;
-              endforeach;
+            // Pokaż numery stron (max 7 — z elipsą dla długich list)
+            $cp    = $pager['current_page'];
+            $tp    = $pager['total_pages'];
+            $pages = [];
+            if ($tp <= 7) {
+              $pages = range(1, $tp);
+            } else {
+              $pages = [1];
+              if ($cp > 3)       $pages[] = '…';
+              for ($i = max(2, $cp - 1); $i <= min($tp - 1, $cp + 1); $i++) $pages[] = $i;
+              if ($cp < $tp - 2) $pages[] = '…';
+              $pages[] = $tp;
+            }
+            foreach ($pages as $p):
+              if ($p === '…'): ?>
+                <span class="muted" style="padding:0 4px;">…</span>
+              <?php elseif ($p == $cp): ?>
+                <span class="btn btn-sm btn-p" style="cursor:default;"><?= $p ?></span>
+              <?php else: ?>
+                <a href="<?= $baseUrl ?>&page=<?= $p ?>" class="btn btn-sm"><?= $p ?></a>
+            <?php endif;
+            endforeach;
             ?>
 
             <?php if ($pager['has_next']): ?>
@@ -174,23 +174,58 @@ require BASE_PATH . '/templates/shared/header.php';
     </div>
 
     <div>
-      <?php if ($durList): ?>
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">Przeglądy DUR</span>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">Przeglądy DUR</span>
+          <?php if ($durList): ?>
             <a href="<?= BASE_URL ?>/index.php?route=dur&line_id=<?= $lineId ?>" class="btn btn-sm">Wszystkie</a>
-          </div>
-          <div class="card-body" style="padding:8px;">
-            <?php foreach ($durList as $r): ?>
+          <?php endif; ?>
+        </div>
+        <div class="card-body" style="padding:8px;">
+          <?php if ($durList): ?>
+            <?php
+            $durStatusConfig = [];
+            try {
+              $saved = (new \App\Models\SettingsModel())->get('dur_review_statuses');
+              if ($saved) $durStatusConfig = json_decode($saved, true) ?? [];
+            } catch (\Throwable $e) {
+            }
+            $durStatusConfig += [
+              'completed'   => ['label' => 'Zakończony', 'color' => '#16a34a'],
+              'partial'     => ['label' => 'Częściowy',  'color' => '#d97706'],
+              'interrupted' => ['label' => 'Przerwany',  'color' => '#dc2626'],
+            ];
+            ?>
+            <?php foreach ($durList as $r):
+              $sc = $durStatusConfig[$r['status']]['color'] ?? '#374151';
+              $sl = $durStatusConfig[$r['status']]['label'] ?? $r['status'];
+            ?>
               <div class="dur-card">
-                <div class="dur-title">
-                  <?= Helpers::reviewTypeLabel($r['review_type'], $typeLabels) ?> — <?= Helpers::e($r['review_date']) ?>
-                  <?= $r['subsystem_name'] ? ' · ' . Helpers::e($r['subsystem_name']) : '' ?>
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">
+                  <div>
+                    <div class="dur-title">
+                      <?= Helpers::reviewTypeLabel($r['review_type'], $typeLabels) ?> — <?= Helpers::e($r['review_date']) ?>
+                      <?= $r['subsystem_name'] ? ' · ' . Helpers::e($r['subsystem_name']) : '' ?>
+                    </div>
+                    <div class="dur-meta">
+                      <?= Helpers::e($r['performer_name']) ?>
+                      <?= $r['duration_minutes'] ? ' · ' . (int)$r['duration_minutes'] . ' min' : '' ?>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                    <span class="badge" style="background:<?= $sc ?>;color:#fff;"><?= $sl ?></span>
+                    <a href="<?= BASE_URL ?>/index.php?route=dur_detail&id=<?= $r['id'] ?>" class="btn btn-sm">Szczegóły</a>
+                  </div>
                 </div>
-                <div class="dur-meta"><?= Helpers::e($r['performer_name']) ?> · <?= (int)$r['duration_minutes'] ?> min</div>
                 <?php foreach (array_slice(explode("\n", $r['activities']), 0, 3) as $a): if (trim($a)): ?>
-                  <div class="dur-item"><span class="ck">✓</span><span><?= Helpers::e(ltrim(trim($a), '-')) ?></span></div>
-                <?php endif; endforeach; ?>
+                    <div class="dur-item"><span class="ck">✓</span><span><?= Helpers::e(ltrim(trim($a), '-')) ?></span></div>
+                <?php endif;
+                endforeach; ?>
+                <?php if ($r['notes']): ?>
+                  <div style="margin-top:6px;padding:5px 8px;background:#fffbeb;border-radius:5px;font-size:12px;color:#78350f;">
+                    ⚠ <?= Helpers::e($r['notes']) ?>
+                  </div>
+                <?php endif; ?>
                 <?php if ($r['next_review_date']): ?>
                   <div class="dur-next">
                     <span style="color:#7c3aed;">▶</span>
@@ -199,9 +234,13 @@ require BASE_PATH . '/templates/shared/header.php';
                 <?php endif; ?>
               </div>
             <?php endforeach; ?>
-          </div>
+          <?php else: ?>
+            <div class="muted fs-sm" style="text-align:center;padding:12px 0;">
+              Brak przeglądów DUR dla tej linii.
+            </div>
+          <?php endif; ?>
         </div>
-      <?php endif; ?>
+      </div>
     </div>
   </div>
 

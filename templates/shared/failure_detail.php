@@ -194,7 +194,7 @@ $mechanics   = $mechanics   ?? [];
     </div>
 
     <!-- Obsada zgłoszenia -->
-    <?php if ($canEdit || $isReporter): ?>
+    <?php if ($canEdit || $isReporter || \App\Helpers\Auth::check()): ?>
       <div class="card mb2" id="crewCard">
         <div class="card-head">
           <span class="card-title">👷 Obsada zgłoszenia</span>

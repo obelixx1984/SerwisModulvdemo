@@ -360,12 +360,8 @@ class FailureController
         $canView    = Auth::isMechanic() || Auth::hasPermission('failures');
         $isReporter = (int)($failure['reporter_user_id'] ?? 0) === (int)$user['id'];
         $canEdit    = Auth::isMechanic() || Auth::hasPermission('statuses');
-
-        if (!$canView && !$isReporter) {
-            Helpers::flash('error', 'Brak uprawnień do szczegółów zgłoszenia.');
-            Helpers::redirect('dashboard');
-            return;
-        }
+        // Każdy zalogowany użytkownik może zobaczyć szczegóły zgłoszenia w trybie podglądu.
+        // $canEdit i $isReporter kontrolują co może zrobić na tej stronie.
 
         $history    = $fm->getHistory($id);
         $comments   = $fm->getComments($id);
@@ -1418,7 +1414,7 @@ class AdminController
 
         $id          = (int)($_POST['tmpl_id'] ?? 0);
         $name        = trim($_POST['name'] ?? '');
-        $reviewType  = $_POST['review_type'] ?? 'monthly';
+        $reviewType  = 'monthly';
         $checklist   = trim($_POST['checklist'] ?? '');
         $isActive    = (int)($_POST['is_active'] ?? 1);
 
@@ -1541,6 +1537,8 @@ class AdminController
         $sm->set('company_name',     trim($_POST['company_name'] ?? ''));
         $sm->set('dur_warning_days', (string)max(1, (int)($_POST['dur_warning_days'] ?? 7)));
         $sm->set('records_per_page', (string)max(5, (int)($_POST['records_per_page'] ?? 25)));
+        $idleMinutes = max(0, (int)($_POST['session_idle_timeout'] ?? 5));
+        $sm->set('session_idle_timeout', (string)$idleMinutes);
         Helpers::flash('success', 'Ustawienia zapisane.');
         Helpers::redirect('admin_settings');
     }

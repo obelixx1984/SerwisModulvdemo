@@ -58,7 +58,6 @@ foreach ($typeLabels as $k => $v) {
         <thead>
           <tr>
             <th>Nazwa</th>
-            <th>Typ</th>
             <th>Czynności</th>
             <th>Aktywny</th>
             <th></th>
@@ -68,7 +67,6 @@ foreach ($typeLabels as $k => $v) {
           <?php foreach ($templates as $t): ?>
             <tr>
               <td class="fw6"><?= Helpers::e($t['name']) ?></td>
-              <td><?= Helpers::statusBadge(Helpers::reviewTypeLabel($t['review_type'], $typeLabels ?? []), '#7c3aed') ?></td>
               <td class="muted fs-sm"><?= count(array_filter(explode("\n", $t['checklist'] ?? ''), 'trim')) ?> poz.</td>
               <td><?= Helpers::statusBadge($t['is_active'] ? 'Tak' : 'Nie', $t['is_active'] ? '#16a34a' : '#6b7280') ?></td>
               <td>
@@ -102,16 +100,6 @@ foreach ($typeLabels as $k => $v) {
           <input class="fc" name="name" id="tmplName" placeholder="np. Przegląd tygodniowy lakierni">
         </div>
         <div class="fg">
-          <label class="flbl">Typ przeglądu</label>
-          <select class="fc" name="review_type" id="tmplType">
-            <?php foreach ($allTypes as $key => $label): ?>
-              <?php if (in_array($key, $activeTypes)): ?>
-                <option value="<?= $key ?>" <?= $key === 'monthly' ? 'selected' : '' ?>><?= $label ?></option>
-              <?php endif; ?>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="fg">
           <label class="flbl">Lista czynności <span class="muted" style="font-weight:400;">(jedna per linia)</span></label>
           <textarea class="fc" name="checklist" id="tmplChecklist" rows="8"
             placeholder="- Kontrola wizualna maszyny&#10;- Sprawdzenie poziomu olejów&#10;- Smarowanie punktów"></textarea>
@@ -137,7 +125,6 @@ foreach ($typeLabels as $k => $v) {
     btn.addEventListener('click', function() {
       document.getElementById('tmplId').value = this.dataset.id;
       document.getElementById('tmplName').value = this.dataset.name;
-      document.getElementById('tmplType').value = this.dataset.type;
       document.getElementById('tmplChecklist').value = this.dataset.checklist;
       document.getElementById('tmplActive').value = this.dataset.active;
       document.getElementById('tmplFormTitle').textContent = 'Edytuj szablon DUR';
@@ -151,7 +138,6 @@ foreach ($typeLabels as $k => $v) {
   function resetTmplForm() {
     document.getElementById('tmplId').value = '0';
     document.getElementById('tmplName').value = '';
-    document.getElementById('tmplType').value = 'monthly';
     document.getElementById('tmplChecklist').value = '';
     document.getElementById('tmplActive').value = '1';
     document.getElementById('tmplFormTitle').textContent = 'Nowy szablon DUR';

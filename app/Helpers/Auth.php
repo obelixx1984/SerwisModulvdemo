@@ -18,8 +18,17 @@ class Auth
             session_start();
 
             // Wyloguj po bezczynności
-            if (!empty($_SESSION['last_activity'])) {
-                if (time() - $_SESSION['last_activity'] > SESSION_IDLE_TIMEOUT) {
+            $idleTimeout = SESSION_IDLE_TIMEOUT; // fallback z config
+            try {
+                $dbVal = (new \App\Models\SettingsModel())->get('session_idle_timeout');
+                if ($dbVal !== null) {
+                    $idleTimeout = (int)$dbVal * 60; // minuty → sekundy
+                }
+            } catch (\Throwable $e) {
+            }
+
+            if ($idleTimeout > 0 && !empty($_SESSION['last_activity'])) {
+                if (time() - $_SESSION['last_activity'] > $idleTimeout) {
                     self::logout();
                     Helpers::redirect('login');
                 }

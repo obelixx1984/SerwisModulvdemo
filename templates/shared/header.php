@@ -1322,11 +1322,19 @@ $adminRoutes = [
       }
     }
   </style>
-  
-  <?php if ($user): ?>
+
+  <?php
+  $idleMinutes = 5;
+  try {
+    $dbVal = (new \App\Models\SettingsModel())->get('session_idle_timeout');
+    if ($dbVal !== null) $idleMinutes = (int)$dbVal;
+  } catch (\Throwable $e) {
+  }
+  ?>
+  <?php if ($user && $idleMinutes > 0): ?>
     <script>
       (function() {
-        var timeout = <?= SESSION_IDLE_TIMEOUT ?> * 1000; // sekundy → milisekundy
+        var timeout = <?= $idleMinutes * 60 * 1000 ?>;
         var timer;
 
         function resetTimer() {
@@ -1335,15 +1343,12 @@ $adminRoutes = [
             window.location.href = '<?= BASE_URL ?>/index.php?route=logout';
           }, timeout);
         }
-
-        // Resetuj licznik przy każdej aktywności użytkownika
         ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'].forEach(function(evt) {
           document.addEventListener(evt, resetTimer, {
             passive: true
           });
         });
-
-        resetTimer(); // uruchom licznik od razu
+        resetTimer();
       })();
     </script>
   <?php endif; ?>

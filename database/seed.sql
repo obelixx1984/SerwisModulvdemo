@@ -160,6 +160,7 @@ INSERT INTO `settings` (`skey`, `svalue`, `label`) VALUES
 ('company_name',     'FINCO Stal Serwis', 'Nazwa firmy'),
 ('dur_warning_days', '7',                 'Ostrzeżenie DUR (dni przed terminem)'),
 ('records_per_page', '25',                'Liczba rekordów na stronę')
+('session_idle_timeout', '5',             'Czas bezczynności przed wylogowaniem (minuty, 0 = wyłączone)'),
 ON DUPLICATE KEY UPDATE svalue = VALUES(svalue);
 
 -- ────────────────────────────────────────────────────────────
