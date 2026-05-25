@@ -27,6 +27,7 @@ spl_autoload_register(function (string $class): void {
             'App\\Models\\MaintenanceModel'     => $mdl,
             'App\\Models\\SettingsModel'        => $mdl,
             'App\\Models\\RoleModel'            => $mdl,
+            'App\\Models\\ScheduleNoteModel'    => $mdl,
             'App\\Models\\AssignmentModel'      => $mdl,
             'App\\Controllers\\AuthController'    => $ctrl,
             'App\\Controllers\\PublicController'  => $ctrl,
@@ -108,6 +109,12 @@ $routes = [
     'admin_tmpl_save'     => ['App\\Controllers\\AdminController',   'tmplSave'],
     'admin_sched_save'    => ['App\\Controllers\\AdminController',   'schedSave'],
     'check_duplicate'     => ['App\\Controllers\\AjaxController',    'checkDuplicate'],
+
+    'ajax_note_add'    => ['App\\Controllers\\AjaxController', 'noteAdd'],
+    'ajax_note_edit'   => ['App\\Controllers\\AjaxController', 'noteEdit'],
+    'ajax_note_delete' => ['App\\Controllers\\AjaxController', 'noteDelete'],
+    'ajax_notes_get'   => ['App\\Controllers\\AjaxController', 'notesGet'],
+
     'admin_user_delete'   => ['App\\Controllers\\AdminController',   'deleteUser'],
     'admin_line_delete'   => ['App\\Controllers\\AdminController',   'deleteLine'],
     'admin_status_delete' => ['App\\Controllers\\AdminController',   'deleteStatus'],

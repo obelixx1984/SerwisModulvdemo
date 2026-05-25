@@ -301,7 +301,7 @@ $currentUserId = (int)($user['id'] ?? 0);
     </div>
     <div class="notes-modal-body" id="notesModalBody"></div>
     <div class="notes-modal-foot">
-      <form method="POST" action="<?= BASE_URL ?>/index.php?route=dur_note_add">
+      <form id="noteAddForm">
         <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
         <input type="hidden" name="schedule_id" id="noteScheduleId" value="">
         <div style="display:flex;gap:8px;align-items:flex-end;">
@@ -316,29 +316,6 @@ $currentUserId = (int)($user['id'] ?? 0);
   </div>
 </div>
 
-<!-- Modal: edycja uwagi -->
-<div class="notes-modal-overlay" id="noteEditModal" onclick="closeNoteEditModalOutside(event)">
-  <div class="notes-modal-box" role="dialog" aria-modal="true" style="max-height:auto;">
-    <div class="notes-modal-head">
-      <span class="notes-modal-title">Edytuj uwagę</span>
-      <button class="notes-modal-close" onclick="closeNoteEditModal()" type="button">×</button>
-    </div>
-    <div style="padding:14px;">
-      <form method="POST" action="<?= BASE_URL ?>/index.php?route=dur_note_edit">
-        <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
-        <input type="hidden" name="note_id" id="editNoteId" value="">
-        <div class="fg">
-          <label class="flbl">Treść uwagi</label>
-          <textarea name="note" id="editNoteText" class="fc" rows="3" required></textarea>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button type="submit" class="btn btn-p btn-sm">Zapisz</button>
-          <button type="button" class="btn btn-sm" onclick="closeNoteEditModal()">Anuluj</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
 
 <script>
   var SCHEDULE_NOTES_DATA = <?php
@@ -355,19 +332,20 @@ $currentUserId = (int)($user['id'] ?? 0);
   var CURRENT_USER_ID = <?= $currentUserId ?>;
   var BASE_URL_JS = '<?= BASE_URL ?>';
   var CSRF = '<?= \App\Helpers\Auth::csrfToken() ?>';
+  var activeScheduleId = null;
 
   function openNotesModal(scheduleId, lineName, typeName) {
+    activeScheduleId = scheduleId;
     document.getElementById('notesModalTitle').textContent = '📝 ' + lineName + ' — ' + typeName;
     document.getElementById('noteScheduleId').value = scheduleId;
     document.getElementById('noteText').value = '';
-    renderNotes(scheduleId);
+    renderNotes(SCHEDULE_NOTES_DATA[scheduleId] || []);
     document.getElementById('notesModal').classList.add('open');
     document.body.style.overflow = 'hidden';
   }
 
-  function renderNotes(scheduleId) {
+  function renderNotes(notes) {
     var body = document.getElementById('notesModalBody');
-    var notes = SCHEDULE_NOTES_DATA[scheduleId] || [];
     if (!notes.length) {
       body.innerHTML = '<div class="muted fs-sm" style="text-align:center;padding:20px;">Brak uwag. Dodaj pierwszą poniżej.</div>';
       return;
@@ -376,17 +354,17 @@ $currentUserId = (int)($user['id'] ?? 0);
     notes.forEach(function(n) {
       var isOwner = (parseInt(n.user_id) === CURRENT_USER_ID);
       var dt = (n.created_at || '').substring(0, 16).replace('T', ' ');
-      html += '<div class="note-item">';
+      html += '<div class="note-item" id="note-item-' + n.id + '">';
       html += '<div style="display:flex;justify-content:space-between;margin-bottom:5px;">';
       html += '<span style="font-weight:700;color:#374151;">' + esc(n.user_name) + '</span>';
       html += '<div style="display:flex;align-items:center;gap:6px;">';
       html += '<span style="color:#9ca3af;font-size:11px;">' + dt + '</span>';
       if (isOwner) {
-        html += '<button class="btn btn-sm" style="padding:2px 7px;font-size:11px;" onclick="openNoteEdit(' + n.id + ',' + JSON.stringify(n.note) + ')">✏</button>';
+        html += '<button class="btn btn-sm" style="padding:2px 7px;font-size:11px;" data-note-id="' + n.id + '" onclick="openNoteEdit(this)">✏</button>';
         html += '<button class="btn btn-sm" style="padding:2px 7px;font-size:11px;color:#dc2626;border-color:#fca5a5;" onclick="deleteNote(' + n.id + ')">✕</button>';
       }
       html += '</div></div>';
-      html += '<div style="color:#374151;white-space:pre-wrap;word-break:break-word;">' + esc(n.note) + '</div>';
+      html += '<div class="note-text" style="color:#374151;white-space:pre-wrap;word-break:break-word;">' + esc(n.note) + '</div>';
       html += '</div>';
     });
     body.innerHTML = html;
@@ -399,41 +377,152 @@ $currentUserId = (int)($user['id'] ?? 0);
   function closeNotesModal() {
     document.getElementById('notesModal').classList.remove('open');
     document.body.style.overflow = '';
+    activeScheduleId = null;
   }
 
   function closeNotesModalOutside(e) {
     if (e.target === document.getElementById('notesModal')) closeNotesModal();
   }
 
-  function openNoteEdit(id, text) {
-    document.getElementById('editNoteId').value = id;
-    document.getElementById('editNoteText').value = text;
-    document.getElementById('noteEditModal').classList.add('open');
+  // Dodawanie uwagi — AJAX, modal zostaje otwarty
+  document.getElementById('noteAddForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var noteText = document.getElementById('noteText').value.trim();
+    if (!noteText) return;
+
+    var fd = new FormData();
+    fd.append('csrf_token', CSRF);
+    fd.append('schedule_id', activeScheduleId);
+    fd.append('note', noteText);
+
+    fetch(BASE_URL_JS + '/index.php?route=ajax_note_add', {
+        method: 'POST',
+        body: fd
+      })
+      .then(function(r) {
+        return r.json();
+      })
+      .then(function(data) {
+        if (data.ok) {
+          SCHEDULE_NOTES_DATA[activeScheduleId] = data.notes;
+          renderNotes(data.notes);
+          document.getElementById('noteText').value = '';
+        } else {
+          alert(data.error || 'Błąd zapisu uwagi');
+        }
+      })
+      .catch(function() {
+        alert('Błąd połączenia');
+      });
+  });
+
+  // Edycja inline
+  function openNoteEdit(btn) {
+    var noteId = parseInt(btn.dataset.noteId);
+    var notes = SCHEDULE_NOTES_DATA[activeScheduleId] || [];
+    var noteObj = notes.find(function(n) {
+      return parseInt(n.id) === noteId;
+    });
+    if (!noteObj) return;
+    var noteText = noteObj.note;
+
+    var noteDiv = document.getElementById('note-item-' + noteId);
+    if (!noteDiv || noteDiv.querySelector('textarea')) return;
+    var textDiv = noteDiv.querySelector('.note-text');
+    if (!textDiv) return;
+
+    var ta = document.createElement('textarea');
+    ta.style.cssText = 'width:100%;font-size:13px;padding:5px;border:1px solid #c4b5fd;border-radius:6px;resize:vertical;min-height:60px;';
+    ta.value = noteText;
+
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:6px;margin-top:6px;';
+
+    var btnSave = document.createElement('button');
+    btnSave.className = 'btn btn-p btn-sm';
+    btnSave.style.cssText = 'font-size:11px;padding:3px 10px;';
+    btnSave.textContent = 'Zapisz';
+    btnSave.onclick = function() {
+      saveNoteEdit(noteId, ta);
+    };
+
+    var btnCancel = document.createElement('button');
+    btnCancel.className = 'btn btn-sm';
+    btnCancel.style.cssText = 'font-size:11px;padding:3px 10px;';
+    btnCancel.textContent = 'Anuluj';
+    btnCancel.onclick = function() {
+      renderNotes(SCHEDULE_NOTES_DATA[activeScheduleId] || []);
+    };
+
+    btnRow.appendChild(btnSave);
+    btnRow.appendChild(btnCancel);
+    textDiv.innerHTML = '';
+    textDiv.appendChild(ta);
+    textDiv.appendChild(btnRow);
+    ta.focus();
   }
 
-  function closeNoteEditModal() {
-    document.getElementById('noteEditModal').classList.remove('open');
-  }
-
-  function closeNoteEditModalOutside(e) {
-    if (e.target === document.getElementById('noteEditModal')) closeNoteEditModal();
-  }
-
-  function deleteNote(id) {
-    if (!confirm('Usunąć tę uwagę?')) return;
-    var f = document.createElement('form');
-    f.method = 'POST';
-    f.action = BASE_URL_JS + '/index.php?route=dur_note_delete';
-    f.innerHTML = '<input type="hidden" name="csrf_token" value="' + CSRF + '">' +
-      '<input type="hidden" name="note_id" value="' + id + '">';
-    document.body.appendChild(f);
-    f.submit();
-  }
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-      closeNoteEditModal();
-      closeNotesModal();
+  function saveNoteEdit(noteId, ta) {
+    var newText = ta.value.trim();
+    if (!newText) {
+      alert('Treść uwagi nie może być pusta.');
+      return;
     }
+
+    var fd = new FormData();
+    fd.append('csrf_token', CSRF);
+    fd.append('note_id', noteId);
+    fd.append('note', newText);
+
+    fetch(BASE_URL_JS + '/index.php?route=ajax_note_edit', {
+        method: 'POST',
+        body: fd
+      })
+      .then(function(r) {
+        return r.json();
+      })
+      .then(function(data) {
+        if (data.ok) {
+          SCHEDULE_NOTES_DATA[activeScheduleId] = data.notes;
+          renderNotes(data.notes);
+        } else {
+          alert(data.error || 'Błąd zapisu');
+          renderNotes(SCHEDULE_NOTES_DATA[activeScheduleId] || []);
+        }
+      })
+      .catch(function() {
+        alert('Błąd połączenia');
+      });
+  }
+
+  function deleteNote(noteId) {
+    if (!confirm('Usunąć tę uwagę?')) return;
+    var fd = new FormData();
+    fd.append('csrf_token', CSRF);
+    fd.append('note_id', noteId);
+
+    fetch(BASE_URL_JS + '/index.php?route=ajax_note_delete', {
+        method: 'POST',
+        body: fd
+      })
+      .then(function(r) {
+        return r.json();
+      })
+      .then(function(data) {
+        if (data.ok) {
+          SCHEDULE_NOTES_DATA[activeScheduleId] = data.notes;
+          renderNotes(data.notes);
+        } else {
+          alert(data.error || 'Błąd usuwania');
+        }
+      })
+      .catch(function() {
+        alert('Błąd połączenia');
+      });
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeNotesModal();
   });
 </script>
 
