@@ -209,5 +209,13 @@ foreach ($lines as $l) {
         '&review_type=' + encodeURIComponent(type);
     }
   }
+
+  // Po załadowaniu strony — jeśli linia jest preselected, wypełnij podzespoły
+  document.addEventListener('DOMContentLoaded', function() {
+    var lineId = document.getElementById('durLineSel').value;
+    if (lineId) {
+      updateDurSubs(lineId);
+    }
+  });
 </script>
 <?php require BASE_PATH . '/templates/shared/footer.php'; ?>

@@ -55,6 +55,7 @@ $currentUserId = (int)($user['id'] ?? 0);
           <button
             type="button"
             class="btn btn-sm"
+            id="notes-btn-<?= (int)$u['id'] ?>"
             style="position:relative;<?= $noteCount > 0 ? 'padding-right:22px;' : '' ?>"
             onclick="openNotesModal(
           <?= (int)$u['id'] ?>,
@@ -380,6 +381,31 @@ $currentUserId = (int)($user['id'] ?? 0);
     activeScheduleId = null;
   }
 
+  function updateNoteBadge(scheduleId) {
+    var btn = document.getElementById('notes-btn-' + scheduleId);
+    if (!btn) return;
+    var notes = SCHEDULE_NOTES_DATA[scheduleId] || [];
+    var count = notes.length;
+
+    // Usuń stary badge
+    var oldBadge = btn.querySelector('span[data-badge]');
+    if (oldBadge) oldBadge.remove();
+
+    if (count > 0) {
+      btn.style.paddingRight = '22px';
+      var span = document.createElement('span');
+      span.setAttribute('data-badge', '1');
+      span.style.cssText = 'position:absolute;top:-6px;right:-6px;' +
+        'background:#dc2626;color:#fff;border-radius:50%;' +
+        'width:18px;height:18px;font-size:10px;font-weight:700;' +
+        'display:flex;align-items:center;justify-content:center;';
+      span.textContent = count;
+      btn.appendChild(span);
+    } else {
+      btn.style.paddingRight = '';
+    }
+  }
+
   function closeNotesModalOutside(e) {
     if (e.target === document.getElementById('notesModal')) closeNotesModal();
   }
@@ -406,6 +432,7 @@ $currentUserId = (int)($user['id'] ?? 0);
         if (data.ok) {
           SCHEDULE_NOTES_DATA[activeScheduleId] = data.notes;
           renderNotes(data.notes);
+          updateNoteBadge(activeScheduleId);
           document.getElementById('noteText').value = '';
         } else {
           alert(data.error || 'Błąd zapisu uwagi');
