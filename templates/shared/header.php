@@ -1019,7 +1019,7 @@ $adminRoutes = [
 
     /* Na mobile (sidebar zwinięty do 52px) */
     @media (max-width: 700px) {
-      crewNotice {
+      #crewNotice {
         left: 52px;
       }
     }

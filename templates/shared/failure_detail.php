@@ -603,163 +603,201 @@ $mechanics   = $mechanics   ?? [];
 </div>
 
 <script>
-/*
- * KLUCZ ZMIANY: cały kod który wymaga DOM-u przeniesiony do
- * DOMContentLoaded. "toggleOther" zmieniony z deklaracji funkcji
- * (wewnątrz bloku if) na zmienną — to był główny błąd JS.
- * Funkcje globalne (openEditModal itp.) zostają poza wrapperem.
- */
-document.addEventListener('DOMContentLoaded', function () {
+  /*
+   * KLUCZ ZMIANY: cały kod który wymaga DOM-u przeniesiony do
+   * DOMContentLoaded. "toggleOther" zmieniony z deklaracji funkcji
+   * (wewnątrz bloku if) na zmienną — to był główny błąd JS.
+   * Funkcje globalne (openEditModal itp.) zostają poza wrapperem.
+   */
+  document.addEventListener('DOMContentLoaded', function() {
 
-  // ── Filtrowanie słownika po kategorii ──────────────────────
-  var catSel  = document.getElementById('mechCat');
-  var dictSel = document.getElementById('mechDict');
-  if (catSel && dictSel) {
-    function filterDict(catId) {
-      dictSel.querySelectorAll('option[data-cat]').forEach(function (o) {
-        o.style.display = (!catId || o.dataset.cat == catId) ? '' : 'none';
+    // ── Filtrowanie słownika po kategorii ──────────────────────
+    var catSel = document.getElementById('mechCat');
+    var dictSel = document.getElementById('mechDict');
+    if (catSel && dictSel) {
+      function filterDict(catId) {
+        dictSel.querySelectorAll('option[data-cat]').forEach(function(o) {
+          o.style.display = (!catId || o.dataset.cat == catId) ? '' : 'none';
+        });
+      }
+      catSel.addEventListener('change', function() {
+        filterDict(this.value);
+      });
+      filterDict(catSel.value);
+    }
+
+    // ── Inna usterka — toggle textarea ─────────────────────────
+    var otherChk = document.getElementById('otherFailureChk');
+    var noteWrap = document.getElementById('mechanicNoteWrap');
+    var dictWrap = document.getElementById('dictWrap');
+    if (otherChk) {
+      // WAŻNE: zmienna (var), NIE deklaracja funkcji wewnątrz bloku if
+      var toggleOther = function() {
+        var on = otherChk.checked;
+        if (noteWrap) noteWrap.style.display = on ? '' : 'none';
+        if (dictWrap) dictWrap.style.display = on ? 'none' : '';
+      };
+      otherChk.addEventListener('change', toggleOther);
+      toggleOther();
+    }
+
+    // ── Walidacja przed zmianą na status końcowy ───────────────
+    var sel = document.getElementById('statusSelect');
+    if (sel) {
+      var hasCategory = <?= !empty($failure['category_id']) ? 'true' : 'false' ?>;
+      var hasDict = <?= (!empty($failure['dictionary_item_id']) || !empty($failure['other_failure'])) ? 'true' : 'false' ?>;
+      var crewCount = <?= count($assignments) ?>;
+      var catNotice = document.getElementById('catNotice');
+      var crewNotice = document.getElementById('crewNotice');
+
+      sel.addEventListener('change', function() {
+        var opt = this.options[this.selectedIndex];
+        var isFinal = opt && opt.dataset.final === '1';
+
+        // PO — przy ukrywaniu resetuj też top do 0
+        // żeby następnym razem crewNotice startował od góry
+        if (catNotice) catNotice.style.display = 'none';
+        if (crewNotice) {
+          crewNotice.style.display = 'none';
+          crewNotice.style.top = '0'; // reset pozycji
+        }
+        if (!isFinal) return;
+
+        // PO — crewNotice przesuwa się dynamicznie pod catNotice jeśli ten jest widoczny
+        if (!hasCategory || !hasDict) {
+          if (catNotice) catNotice.style.display = 'block';
+        }
+        if (crewCount === 0) {
+          if (crewNotice) {
+            // Zmierz wysokość catNotice — jeśli jest widoczny, przesuń crewNotice pod niego
+            // Jeśli catNotice jest ukryty, catHeight = 0 i crewNotice pojawi się od samej góry
+            var catHeight = (catNotice && catNotice.style.display === 'block') ?
+              catNotice.offsetHeight :
+              0;
+            crewNotice.style.top = catHeight + 'px';
+            crewNotice.style.display = 'block';
+          }
+        }
       });
     }
-    catSel.addEventListener('change', function () { filterDict(this.value); });
-    filterDict(catSel.value);
-  }
 
-  // ── Inna usterka — toggle textarea ─────────────────────────
-  var otherChk = document.getElementById('otherFailureChk');
-  var noteWrap = document.getElementById('mechanicNoteWrap');
-  var dictWrap = document.getElementById('dictWrap');
-  if (otherChk) {
-    // WAŻNE: zmienna (var), NIE deklaracja funkcji wewnątrz bloku if
-    var toggleOther = function () {
-      var on = otherChk.checked;
-      if (noteWrap) noteWrap.style.display = on ? '' : 'none';
-      if (dictWrap) dictWrap.style.display = on ? 'none' : '';
-    };
-    otherChk.addEventListener('change', toggleOther);
-    toggleOther();
-  }
+  }); // koniec DOMContentLoaded
 
-  // ── Walidacja przed zmianą na status końcowy ───────────────
-  var sel = document.getElementById('statusSelect');
-  if (sel) {
-    var hasCategory  = <?= !empty($failure['category_id']) ? 'true' : 'false' ?>;
-    var hasDict      = <?= (!empty($failure['dictionary_item_id']) || !empty($failure['other_failure'])) ? 'true' : 'false' ?>;
-    var crewCount    = <?= count($assignments) ?>;
-    var catNotice    = document.getElementById('catNotice');
-    var crewNotice   = document.getElementById('crewNotice');
+  // ── Funkcje globalne (muszą być poza DOMContentLoaded ─────────
+  //    bo są wywoływane przez onclick="..." w HTML) ──────────────
 
-    sel.addEventListener('change', function () {
-      var opt     = this.options[this.selectedIndex];
-      var isFinal = opt && opt.dataset.final === '1';
+  function toggleOtherFailure(checked) {
+    var dictGrp = document.getElementById('dictGrp');
+    var dictSel = document.getElementById('mechDict');
+    var grp = document.getElementById('mechanicNoteGrp');
+    var note = document.getElementById('mechanicNote');
 
-      if (catNotice)  catNotice.style.display  = 'none';
-      if (crewNotice) crewNotice.style.display = 'none';
-      if (!isFinal) return;
-
-      if (!hasCategory || !hasDict) {
-        if (catNotice) catNotice.style.display = 'block';
+    if (checked) {
+      if (dictGrp) {
+        dictGrp.style.opacity = '.4';
+        dictGrp.style.pointerEvents = 'none';
       }
-      if (crewCount === 0) {
-        if (crewNotice) crewNotice.style.display = 'block';
+      if (dictSel) {
+        dictSel.disabled = true;
+        dictSel.value = '';
       }
-    });
+      if (grp) grp.style.display = 'block';
+      if (note) note.required = true;
+    } else {
+      if (dictGrp) {
+        dictGrp.style.opacity = '';
+        dictGrp.style.pointerEvents = '';
+      }
+      if (dictSel) dictSel.disabled = false;
+      if (grp) grp.style.display = 'none';
+      if (note) note.required = false;
+    }
   }
 
-}); // koniec DOMContentLoaded
+  function openEditModal(failureId, ticket, lineName, subsystemName, currentSymptomId, isOtherSymptom, currentDesc) {
+    var idEl = document.getElementById('editFailureId');
+    var tkEl = document.getElementById('editModalTicket');
+    var lnEl = document.getElementById('editModalLine');
+    var subsRow = document.getElementById('editModalSubsystemRow');
+    var subEl = document.getElementById('editModalSubsystem');
+    var cb = document.getElementById('editOtherSymptomCb');
 
-// ── Funkcje globalne (muszą być poza DOMContentLoaded ─────────
-//    bo są wywoływane przez onclick="..." w HTML) ──────────────
+    if (!idEl || !cb) {
+      console.error('Modal edycji nie znaleziony w DOM');
+      return;
+    }
 
-function toggleOtherFailure(checked) {
-  var dictGrp = document.getElementById('dictGrp');
-  var dictSel = document.getElementById('mechDict');
-  var grp     = document.getElementById('mechanicNoteGrp');
-  var note    = document.getElementById('mechanicNote');
+    idEl.value = failureId;
+    tkEl.textContent = ticket;
+    lnEl.textContent = lineName;
 
-  if (checked) {
-    if (dictGrp) { dictGrp.style.opacity = '.4'; dictGrp.style.pointerEvents = 'none'; }
-    if (dictSel) { dictSel.disabled = true; dictSel.value = ''; }
-    if (grp)  grp.style.display  = 'block';
-    if (note) note.required      = true;
-  } else {
-    if (dictGrp) { dictGrp.style.opacity = ''; dictGrp.style.pointerEvents = ''; }
-    if (dictSel)   dictSel.disabled = false;
-    if (grp)  grp.style.display  = 'none';
-    if (note) note.required      = false;
-  }
-}
+    if (subsystemName && subsystemName.trim() !== '') {
+      subEl.textContent = subsystemName;
+      subsRow.style.display = '';
+    } else {
+      subsRow.style.display = 'none';
+    }
 
-function openEditModal(failureId, ticket, lineName, subsystemName, currentSymptomId, isOtherSymptom, currentDesc) {
-  var idEl    = document.getElementById('editFailureId');
-  var tkEl    = document.getElementById('editModalTicket');
-  var lnEl    = document.getElementById('editModalLine');
-  var subsRow = document.getElementById('editModalSubsystemRow');
-  var subEl   = document.getElementById('editModalSubsystem');
-  var cb      = document.getElementById('editOtherSymptomCb');
+    cb.checked = isOtherSymptom;
+    toggleEditOtherSymptom(isOtherSymptom);
 
-  if (!idEl || !cb) { console.error('Modal edycji nie znaleziony w DOM'); return; }
+    if (isOtherSymptom) {
+      var da = document.getElementById('editDescArea');
+      if (da) da.value = currentDesc || '';
+    } else {
+      var ss = document.getElementById('editSymptomSelect');
+      if (ss) ss.value = currentSymptomId || '';
+    }
 
-  idEl.value       = failureId;
-  tkEl.textContent = ticket;
-  lnEl.textContent = lineName;
-
-  if (subsystemName && subsystemName.trim() !== '') {
-    subEl.textContent   = subsystemName;
-    subsRow.style.display = '';
-  } else {
-    subsRow.style.display = 'none';
+    var modal = document.getElementById('editSymptomModal');
+    if (modal) {
+      modal.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
   }
 
-  cb.checked = isOtherSymptom;
-  toggleEditOtherSymptom(isOtherSymptom);
+  function toggleEditOtherSymptom(checked) {
+    var symptomGrp = document.getElementById('editSymptomGrp');
+    var symptomSel = document.getElementById('editSymptomSelect');
+    var descGrp = document.getElementById('editDescGrp');
+    var descArea = document.getElementById('editDescArea');
 
-  if (isOtherSymptom) {
-    var da = document.getElementById('editDescArea');
-    if (da) da.value = currentDesc || '';
-  } else {
-    var ss = document.getElementById('editSymptomSelect');
-    if (ss) ss.value = currentSymptomId || '';
+    if (checked) {
+      if (symptomGrp) symptomGrp.style.display = 'none';
+      if (symptomSel) {
+        symptomSel.disabled = true;
+        symptomSel.removeAttribute('required');
+        symptomSel.value = '';
+      }
+      if (descGrp) descGrp.style.display = '';
+      if (descArea) descArea.required = true;
+    } else {
+      if (symptomGrp) symptomGrp.style.display = '';
+      if (symptomSel) {
+        symptomSel.disabled = false;
+        symptomSel.required = true;
+      }
+      if (descGrp) descGrp.style.display = 'none';
+      if (descArea) {
+        descArea.required = false;
+        descArea.value = '';
+      }
+    }
   }
 
-  var modal = document.getElementById('editSymptomModal');
-  if (modal) {
-    modal.classList.add('open');
-    document.body.style.overflow = 'hidden';
+  function closeEditModal() {
+    var modal = document.getElementById('editSymptomModal');
+    if (modal) modal.classList.remove('open');
+    document.body.style.overflow = '';
   }
-}
 
-function toggleEditOtherSymptom(checked) {
-  var symptomGrp = document.getElementById('editSymptomGrp');
-  var symptomSel = document.getElementById('editSymptomSelect');
-  var descGrp    = document.getElementById('editDescGrp');
-  var descArea   = document.getElementById('editDescArea');
-
-  if (checked) {
-    if (symptomGrp) symptomGrp.style.display = 'none';
-    if (symptomSel) { symptomSel.disabled = true; symptomSel.removeAttribute('required'); symptomSel.value = ''; }
-    if (descGrp)    descGrp.style.display = '';
-    if (descArea)   descArea.required = true;
-  } else {
-    if (symptomGrp) symptomGrp.style.display = '';
-    if (symptomSel) { symptomSel.disabled = false; symptomSel.required = true; }
-    if (descGrp)    descGrp.style.display = 'none';
-    if (descArea)   { descArea.required = false; descArea.value = ''; }
+  function closeEditModalOutside(e) {
+    if (e.target === document.getElementById('editSymptomModal')) closeEditModal();
   }
-}
 
-function closeEditModal() {
-  var modal = document.getElementById('editSymptomModal');
-  if (modal) modal.classList.remove('open');
-  document.body.style.overflow = '';
-}
-
-function closeEditModalOutside(e) {
-  if (e.target === document.getElementById('editSymptomModal')) closeEditModal();
-}
-
-document.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape') closeEditModal();
-});
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeEditModal();
+  });
 </script>
 
 <?php require BASE_PATH . '/templates/shared/footer.php'; ?>
