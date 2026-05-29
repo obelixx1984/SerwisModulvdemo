@@ -21,7 +21,7 @@ spl_autoload_register(function (string $class): void {
             'App\\Models\\ProductionLineModel'  => $mdl,
             'App\\Models\\CategoryModel'        => $mdl,
             'App\\Models\\DictionaryModel'      => $mdl,
-            'App\\Models\\SymptomModel'         => $mdl,   // Zmiana 1
+            'App\\Models\\SymptomModel'         => $mdl,   
             'App\\Models\\StatusModel'          => $mdl,
             'App\\Models\\FailureModel'         => $mdl,
             'App\\Models\\MaintenanceModel'     => $mdl,
@@ -61,7 +61,7 @@ $routes = [
     'failures'            => ['App\\Controllers\\FailureController', 'list'],
     'failure_detail'      => ['App\\Controllers\\FailureController', 'detail'],
     'status_change'       => ['App\\Controllers\\FailureController', 'changeStatus'],
-    'set_category'        => ['App\\Controllers\\FailureController', 'setCategory'],    // Zmiana 2
+    'set_category'        => ['App\\Controllers\\FailureController', 'setCategory'],    
     'add_comment'         => ['App\\Controllers\\FailureController', 'addComment'],
     'failure_delete'      => ['App\\Controllers\\FailureController', 'deleteFailure'],
     'dur_note_add'        => ['App\\Controllers\\DurController', 'scheduleNoteAdd'],
@@ -75,7 +75,7 @@ $routes = [
     // ── Nowe trasy — użytkownik ──────────────────────────────
     'change_password'     => ['App\\Controllers\\UserController',   'changePassword'],
     'my_failures'         => ['App\\Controllers\\UserController',   'myFailures'],
-    'my_failure_edit'     => ['App\\Controllers\\UserController',   'myFailureEdit'],   // Poprawka błąd 1
+    'my_failure_edit'     => ['App\\Controllers\\UserController',   'myFailureEdit'],   
     // ─────────────────────────────────────────────────────────
     // Obsada zgłoszenia
     'assignment_add'    => ['App\\Controllers\\FailureController', 'addAssignment'],
@@ -94,9 +94,9 @@ $routes = [
     'admin_dictionary'    => ['App\\Controllers\\AdminController',   'dictionary'],
     'admin_cat_save'      => ['App\\Controllers\\AdminController',   'categorySave'],
     'admin_dict_save'     => ['App\\Controllers\\AdminController',   'dictItemSave'],
-    'admin_symptoms'      => ['App\\Controllers\\AdminController',   'symptoms'],       // Zmiana 1
-    'admin_symptom_save'  => ['App\\Controllers\\AdminController',   'symptomSave'],    // Zmiana 1
-    'admin_symptom_delete' => ['App\\Controllers\\AdminController',   'symptomDelete'],  // Zmiana 1
+    'admin_symptoms'      => ['App\\Controllers\\AdminController',   'symptoms'],       
+    'admin_symptom_save'  => ['App\\Controllers\\AdminController',   'symptomSave'],    
+    'admin_symptom_delete' => ['App\\Controllers\\AdminController',   'symptomDelete'], 
     'admin_dur_tmpl'       => ['App\\Controllers\\AdminController',   'durTemplates'],
     'admin_dur_types_save' => ['App\\Controllers\\AdminController',  'durTypesSave'],
     'admin_dur_tmpl_save'  => ['App\\Controllers\\AdminController', 'tmplSave'],
@@ -111,6 +111,10 @@ $routes = [
     'admin_tmpl_save'     => ['App\\Controllers\\AdminController',   'tmplSave'],
     'admin_sched_save'    => ['App\\Controllers\\AdminController',   'schedSave'],
     'check_duplicate'     => ['App\\Controllers\\AjaxController',    'checkDuplicate'],
+
+    // ── Zdjęcia ──────────────────────────────────────────
+    'photo_upload'        => ['App\\Controllers\\FailureController', 'photoUpload'],
+    'photo_delete'        => ['App\\Controllers\\FailureController', 'photoDelete'],
 
     // ── Części zamienne ──────────────────────────────────────────
     'admin_spare_parts'         => ['App\\Controllers\\AdminController', 'spareParts'],

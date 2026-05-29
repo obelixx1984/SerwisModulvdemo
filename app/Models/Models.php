@@ -858,6 +858,50 @@ class FailureModel extends BaseModel
              FROM failures f JOIN failure_statuses fs ON fs.id = f.status_id"
         ) ?? [];
     }
+
+    // ── Zdjęcia zgłoszenia ──────────────────────────────────
+
+    public function getPhotos(int $failureId, bool $onlyPublic = false): array
+    {
+        $sql = "SELECT * FROM failure_photos WHERE failure_id = ?";
+        if ($onlyPublic) {
+            $sql .= " AND is_public = 1";
+        }
+        $sql .= " ORDER BY created_at ASC";
+        return $this->fetchAll($sql, [$failureId]);
+    }
+
+    public function addPhoto(array $d): int
+    {
+        $this->execute(
+            "INSERT INTO failure_photos
+                (failure_id, user_id, username, filename, path, filesize, is_public)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [
+                $d['failure_id'],
+                $d['user_id'],
+                $d['username'],
+                $d['filename'],
+                $d['path'],
+                $d['filesize'],
+                $d['is_public'],
+            ]
+        );
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function getPhotoById(int $photoId): ?array
+    {
+        return $this->fetchOne(
+            "SELECT * FROM failure_photos WHERE id = ?",
+            [$photoId]
+        );
+    }
+
+    public function deletePhoto(int $photoId): void
+    {
+        $this->execute("DELETE FROM failure_photos WHERE id = ?", [$photoId]);
+    }
 }
 
 // ────────────────────────────────────────────────────────────

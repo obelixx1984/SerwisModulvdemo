@@ -303,6 +303,88 @@ $mechanics   = $mechanics   ?? [];
       </div>
     <?php endif; /* koniec canEdit — obsada */ ?>
 
+    <!-- ── Zdjęcia — galeria ─────────────────────────────────── -->
+    <?php if (!empty($photos)): ?>
+      <div class="card mt2" id="photoGalleryCard">
+        <div class="card-head">
+          <span class="card-title">
+            📷 Zdjęcia zgłoszenia
+            <span class="badge bg-secondary ms-1"><?= count($photos) ?></span>
+          </span>
+        </div>
+        <div class="card-body">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;" id="photoGallery">
+            <?php foreach ($photos as $i => $ph): ?>
+              <div class="photo-thumb"
+                style="position:relative;display:inline-block;cursor:pointer;"
+                data-index="<?= $i ?>"
+                role="button"
+                aria-label="Zdjęcie <?= $i + 1 ?> z <?= count($photos) ?>">
+                <img src="<?= BASE_URL . '/' . \App\Helpers\Helpers::e($ph['path']) ?>"
+                  alt="Zdjęcie zgłoszenia <?= $i + 1 ?>"
+                  loading="lazy"
+                  style="width:110px;height:82px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd;display:block;transition:opacity .15s,transform .15s;"
+                  onmouseover="this.style.opacity='.82';this.style.transform='scale(1.03)'"
+                  onmouseout="this.style.opacity='1';this.style.transform='scale(1)'">
+                <?php if (!$ph['is_public']): ?>
+                  <span title="Widoczne tylko dla uprawnionych"
+                    style="position:absolute;top:3px;left:3px;background:rgba(0,0,0,.52);color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;">
+                    🔒 uprawnieni
+                  </span>
+                <?php endif; ?>
+                <div style="font-size:10px;color:#888;text-align:center;margin-top:3px;">
+                  <?= round($ph['filesize'] / 1024) ?> kB
+                </div>
+                <?php if ($canEdit && (\App\Helpers\Auth::isAdmin() || (int)$ph['user_id'] === (int)$user['id'])): ?>
+                  <button class="deletePhotoBtn"
+                    data-id="<?= (int)$ph['id'] ?>"
+                    title="Usuń zdjęcie"
+                    style="position:absolute;bottom:3px;right:3px;background:rgba(163,45,45,.85);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:10px;padding:2px 5px;line-height:1;display:none;">✕</button>
+                <?php endif; ?>
+              </div>
+            <?php endforeach; ?>
+          </div>
+          <p style="font-size:12px;color:#888;margin-top:10px;">
+            Kliknij miniaturę aby powiększyć
+          </p>
+        </div>
+      </div>
+
+      <!-- Lightbox -->
+      <div id="lbBackdrop" role="dialog" aria-modal="true" aria-label="Podgląd zdjęcia"
+        style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:center;justify-content:center;">
+        <div id="lbBox"
+          style="background:#fff;border-radius:12px;border:0.5px solid #ddd;max-width:640px;width:calc(100% - 32px);overflow:hidden;">
+          <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:0.5px solid #ddd;">
+            <div id="lbTitle" style="font-size:13px;font-weight:500;"></div>
+            <button id="lbClose"
+              style="background:none;border:0.5px solid #ddd;border-radius:6px;cursor:pointer;padding:4px 10px;font-size:13px;">
+              ✕ Zamknij
+            </button>
+          </div>
+          <div style="position:relative;background:#000;line-height:0;">
+            <img id="lbImg" src="" alt="Powiększone zdjęcie zgłoszenia"
+              style="width:100%;max-height:420px;object-fit:contain;display:block;">
+            <button id="lbPrev"
+              style="position:absolute;top:50%;left:0;transform:translateY(-50%);background:rgba(0,0,0,.45);border:0;color:#fff;cursor:pointer;padding:14px 10px;font-size:22px;border-radius:0 6px 6px 0;">
+              ‹
+            </button>
+            <button id="lbNext"
+              style="position:absolute;top:50%;right:0;transform:translateY(-50%);background:rgba(0,0,0,.45);border:0;color:#fff;cursor:pointer;padding:14px 10px;font-size:22px;border-radius:6px 0 0 6px;">
+              ›
+            </button>
+          </div>
+          <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-top:0.5px solid #ddd;">
+            <div id="lbMeta" style="font-size:12px;color:#666;display:flex;gap:10px;flex-wrap:wrap;"></div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div id="lbDots" style="display:flex;gap:5px;"></div>
+              <span id="lbCounter" style="font-size:12px;color:#999;min-width:36px;text-align:right;"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    <?php endif; ?>
+
   </div>
 
   <!-- ── Prawa kolumna: historia (zawsze) + akcje (canEdit) ── -->
@@ -529,6 +611,38 @@ $mechanics   = $mechanics   ?? [];
         </div>
       </div>
     <?php endif; /* koniec canEdit — status */ ?>
+
+    <?php if ($canEdit && empty($failure['status_is_final'])): ?>
+      <!-- ── Zdjęcia — upload ─────────────────────────────────── -->
+      <div class="card mt2" id="photoUploadCard">
+        <div class="card-head"><span class="card-title">📷 Dodaj zdjęcia</span></div>
+        <div class="card-body">
+
+          <div id="dropZone" style="border:2px dashed #aaa;border-radius:8px;padding:24px;text-align:center;cursor:pointer;background:#f9f9f9;transition:background .15s;">
+            <div>Przeciągnij zdjęcia tutaj lub
+              <label for="photoFileInput" style="color:#0d6efd;cursor:pointer;text-decoration:underline;"
+                onclick="event.stopPropagation()">wybierz pliki</label>
+            </div>
+            <div style="font-size:.8rem;color:#888;margin-top:4px;">JPEG, PNG · maks. 6 MB na plik · zmniejszane automatycznie do 1920 px</div>
+          </div>
+          <input type="file" id="photoFileInput" accept="image/jpeg,image/png,image/webp" multiple style="display:none;">
+
+          <div class="mt1" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <strong>Widoczność dodawanych zdjęć:</strong>
+            <label style="cursor:pointer;"><input type="radio" name="photoVisibility" value="0" checked> 🔒 Tylko uprawnieni</label>
+            <label style="cursor:pointer;"><input type="radio" name="photoVisibility" value="1"> 🌐 Wszyscy</label>
+          </div>
+
+          <div id="pendingPreviews" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;min-height:0;"></div>
+
+          <div id="uploadProgress" style="display:none;margin-top:8px;color:#555;font-size:.9rem;"></div>
+
+          <button type="button" id="photoUploadBtn" class="btn btn-primary mt1" style="display:none;">
+            Zapisz zdjęcia
+          </button>
+        </div>
+      </div>
+    <?php endif; ?>
 
     <?php if (!$canEdit): ?>
       <div class="card mb2">
@@ -878,6 +992,252 @@ $mechanics   = $mechanics   ?? [];
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeEditModal();
   });
+
+  /* Start Foto */
+
+  (function() {
+
+    /* ═══════════════════════════════════════════
+       Dane zdjęć przekazane z PHP do JS
+    ═══════════════════════════════════════════ */
+    const PHOTOS = <?= json_encode(array_values(array_map(function ($ph) {
+                      return [
+                        'id'     => (int)$ph['id'],
+                        'url'    => BASE_URL . '/' . $ph['path'],
+                        'kb'     => round($ph['filesize'] / 1024),
+                        'pub'    => (bool)$ph['is_public'],
+                        'author' => $ph['username'],
+                        'date'   => $ph['created_at'],
+                      ];
+                    }, $photos ?? []))) ?>;
+
+    /* ═══════════════════════════════════════════
+       Lightbox
+    ═══════════════════════════════════════════ */
+    const backdrop = document.getElementById('lbBackdrop');
+    const lbImg = document.getElementById('lbImg');
+    const lbTitle = document.getElementById('lbTitle');
+    const lbMeta = document.getElementById('lbMeta');
+    const lbDots = document.getElementById('lbDots');
+    const lbCounter = document.getElementById('lbCounter');
+    const lbPrev = document.getElementById('lbPrev');
+    const lbNext = document.getElementById('lbNext');
+    const lbClose = document.getElementById('lbClose');
+
+    let current = 0;
+
+    function openLb(idx) {
+      current = idx;
+      backdrop.style.display = 'flex';
+      updateLb();
+    }
+
+    function closeLb() {
+      backdrop.style.display = 'none';
+    }
+
+    function updateLb() {
+      const p = PHOTOS[current];
+      lbImg.src = p.url;
+      lbTitle.textContent = 'Zdjęcie ' + (current + 1) + ' z ' + PHOTOS.length;
+      lbPrev.style.display = current === 0 ? 'none' : 'block';
+      lbNext.style.display = current === PHOTOS.length - 1 ? 'none' : 'block';
+      lbCounter.textContent = (current + 1) + ' / ' + PHOTOS.length;
+
+      lbMeta.innerHTML =
+        (p.pub ?
+          '<span style="background:#f0f0f0;padding:2px 7px;border-radius:4px;font-size:11px;">🌐 wszyscy</span>' :
+          '<span style="background:#f0f0f0;padding:2px 7px;border-radius:4px;font-size:11px;">🔒 tylko uprawnieni</span>') +
+        '<span>' + p.kb + ' kB</span>' +
+        '<span style="color:#aaa;">' + p.author + ' · ' + p.date + '</span>';
+
+      lbDots.innerHTML = '';
+      PHOTOS.forEach(function(_, i) {
+        const d = document.createElement('button');
+        d.style.cssText = 'width:7px;height:7px;border-radius:50%;border:0;cursor:pointer;padding:0;background:' +
+          (i === current ? '#185FA5' : '#ccc') + ';transition:background .15s,transform .15s;' +
+          (i === current ? 'transform:scale(1.4);' : '');
+        d.setAttribute('aria-label', 'Przejdź do zdjęcia ' + (i + 1));
+        d.addEventListener('click', function() {
+          current = i;
+          updateLb();
+        });
+        lbDots.appendChild(d);
+      });
+    }
+
+    if (lbPrev) lbPrev.addEventListener('click', function() {
+      if (current > 0) {
+        current--;
+        updateLb();
+      }
+    });
+    if (lbNext) lbNext.addEventListener('click', function() {
+      if (current < PHOTOS.length - 1) {
+        current++;
+        updateLb();
+      }
+    });
+    if (lbClose) lbClose.addEventListener('click', closeLb);
+    if (backdrop) backdrop.addEventListener('click', function(e) {
+      if (e.target === backdrop) closeLb();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (!backdrop || backdrop.style.display === 'none') return;
+      if (e.key === 'ArrowLeft' && current > 0) {
+        current--;
+        updateLb();
+      }
+      if (e.key === 'ArrowRight' && current < PHOTOS.length - 1) {
+        current++;
+        updateLb();
+      }
+      if (e.key === 'Escape') closeLb();
+    });
+
+    /* Kliknięcie miniatury → otwórz lightbox */
+    document.querySelectorAll('#photoGallery .photo-thumb').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        if (e.target.classList.contains('deletePhotoBtn')) return;
+        openLb(+this.dataset.index);
+      });
+      /* Pokaż/ukryj przycisk usuwania przy najechaniu */
+      el.addEventListener('mouseenter', function() {
+        const btn = this.querySelector('.deletePhotoBtn');
+        if (btn) btn.style.display = 'block';
+      });
+      el.addEventListener('mouseleave', function() {
+        const btn = this.querySelector('.deletePhotoBtn');
+        if (btn) btn.style.display = 'none';
+      });
+    });
+
+    /* ═══════════════════════════════════════════
+       Upload
+    ═══════════════════════════════════════════ */
+    const FAILURE_ID = <?= (int)$failure['id'] ?>;
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('photoFileInput');
+    const previews = document.getElementById('pendingPreviews');
+    const uploadBtn = document.getElementById('photoUploadBtn');
+    const progressEl = document.getElementById('uploadProgress');
+    if (!dropZone) return;
+    let pendingFiles = [];
+
+    function refreshUploadBtn() {
+      uploadBtn.style.display = pendingFiles.some(Boolean) ? 'inline-block' : 'none';
+    }
+
+    function addFiles(files) {
+      files = Array.isArray(files) ? files : Array.from(files);
+      [...files]
+      .filter(function(f) {
+          return ['image/jpeg', 'image/png', 'image/webp'].includes(f.type);
+        })
+        .filter(function(f) {
+          return f.size <= 6 * 1024 * 1024;
+        })
+        .forEach(function(file) {
+          const idx = pendingFiles.length;
+          pendingFiles.push(file);
+          const reader = new FileReader();
+          reader.onload = function(ev) {
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'position:relative;display:inline-block;';
+            wrap.dataset.idx = idx;
+            wrap.innerHTML =
+              '<img src="' + ev.target.result + '" style="width:100px;height:75px;object-fit:cover;border-radius:6px;border:0.5px solid #ccc;display:block;">' +
+              '<div style="font-size:10px;color:#888;text-align:center;margin-top:2px;">' + (file.size / 1024).toFixed(0) + ' kB</div>' +
+              '<button type="button" style="position:absolute;top:2px;right:2px;background:rgba(163,45,45,.8);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:11px;padding:1px 5px;">✕</button>';
+            wrap.querySelector('button').addEventListener('click', function() {
+              pendingFiles[idx] = null;
+              wrap.remove();
+              refreshUploadBtn();
+            });
+            previews.appendChild(wrap);
+          };
+          reader.readAsDataURL(file);
+        });
+      refreshUploadBtn();
+    }
+
+    dropZone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      dropZone.style.background = '#e8f0fe';
+    });
+    dropZone.addEventListener('dragleave', function() {
+      dropZone.style.background = '#f9f9f9';
+    });
+    dropZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dropZone.style.background = '#f9f9f9';
+      addFiles(e.dataTransfer.files);
+    });
+    dropZone.addEventListener('click', function() {
+      fileInput.click();
+    });
+    fileInput.addEventListener('change', function() {
+      var files = Array.from(fileInput.files);
+      fileInput.value = '';
+      addFiles(files);
+    });
+
+    uploadBtn.addEventListener('click', async function() {
+      const isPublic = document.querySelector('input[name="photoVisibility"]:checked').value;
+      const toUpload = pendingFiles.filter(Boolean);
+      if (!toUpload.length) return;
+
+      uploadBtn.disabled = true;
+      progressEl.style.display = 'block';
+
+      let ok = 0,
+        fail = 0;
+      for (let i = 0; i < toUpload.length; i++) {
+        progressEl.textContent = 'Wysyłanie ' + (i + 1) + ' / ' + toUpload.length + '…';
+        const fd = new FormData();
+        fd.append('failure_id', FAILURE_ID);
+        fd.append('is_public', isPublic);
+        fd.append('photo', toUpload[i]);
+        try {
+          const res = await fetch('<?= BASE_URL ?>/index.php?route=photo_upload', {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin'
+          });
+          const data = await res.json();
+          data.success ? ok++ : fail++;
+        } catch (_) {
+          fail++;
+        }
+      }
+
+      progressEl.textContent = 'Zapisano ' + ok + ' zdjęć' + (fail ? ', błąd: ' + fail : '') + '.';
+      setTimeout(function() {
+        window.location.reload();
+      }, 800);
+    });
+
+    /* Usuwanie */
+    document.querySelectorAll('.deletePhotoBtn').forEach(function(btn) {
+      btn.addEventListener('click', async function(e) {
+        e.stopPropagation();
+        if (!confirm('Usunąć to zdjęcie?')) return;
+        const fd = new FormData();
+        fd.append('photo_id', this.dataset.id);
+        try {
+          await fetch('<?= BASE_URL ?>/index.php?route=photo_delete', {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin'
+          });
+        } finally {
+          window.location.reload();
+        }
+      });
+    });
+
+  })();
 </script>
 
 <?php require BASE_PATH . '/templates/shared/footer.php'; ?>

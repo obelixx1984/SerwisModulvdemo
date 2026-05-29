@@ -215,7 +215,7 @@ CREATE TABLE IF NOT EXISTS `failure_history` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
--- Szablony DUR 
+-- Szablony DUR
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `maintenance_templates` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -240,7 +240,7 @@ CREATE TABLE IF NOT EXISTS `maintenance_templates` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
--- Harmonogram DUR 
+-- Harmonogram DUR
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `maintenance_schedules` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -268,7 +268,7 @@ CREATE TABLE IF NOT EXISTS `maintenance_schedules` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
--- Raporty DUR 
+-- Raporty DUR
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `maintenance_reviews` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -378,6 +378,27 @@ CREATE TABLE IF NOT EXISTS `failure_spare_parts` (
     CONSTRAINT `fk_fsp_failure` FOREIGN KEY (`failure_id`) REFERENCES `failures` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_fsp_category` FOREIGN KEY (`category_id`) REFERENCES `spare_part_categories` (`id`),
     CONSTRAINT `fk_fsp_added_by` FOREIGN KEY (`added_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- ────────────────────────────────────────────────────────────
+-- Zdjęcia do zgłoszeń awarii
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `failure_photos` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `failure_id` INT UNSIGNED NOT NULL,
+    `user_id` INT UNSIGNED NOT NULL,
+    `username` VARCHAR(80) NOT NULL,
+    `filename` VARCHAR(255) NOT NULL,
+    `path` VARCHAR(500) NOT NULL COMMENT 'foto/{username}/{ticket_number}/{filename}',
+    `filesize` INT UNSIGNED NOT NULL DEFAULT 0,
+    `is_public` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0=tylko uprawnieni, 1=wszyscy',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_photos_failure` (`failure_id`),
+    KEY `idx_photos_user` (`user_id`),
+    KEY `idx_photos_public` (`is_public`),
+    CONSTRAINT `fk_photos_failure` FOREIGN KEY (`failure_id`) REFERENCES `failures` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_photos_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

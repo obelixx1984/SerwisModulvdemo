@@ -22,6 +22,22 @@ use App\Models\{
     SymptomModel
 };
 
+use function imagecreatefromjpeg;
+use function imagecreatefrompng;
+use function imagecreatefromwebp;
+use function imagecreatetruecolor;
+use function imagecopyresampled;
+use function imagedestroy;
+use function imagejpeg;
+use function imagesx;
+use function imagesy;
+use function mime_content_type;
+use function filesize;
+use function is_dir;
+use function mkdir;
+use function file_exists;
+use function unlink;
+
 // ────────────────────────────────────────────────────────────
 class AuthController
 {
@@ -391,6 +407,9 @@ class FailureController
         $hasLeader   = !empty(array_filter($assignments, fn($a) => !empty($a['is_first'])));
         $symptoms    = (new SymptomModel())->getActive();  // ← DODAJ
         // ────────────────────────────────────────────────────────────
+
+        // Zdjęcia — uprawnieni widzą wszystkie, pozostali tylko publiczne
+        $photos = $fm->getPhotos($id, !$canEdit);
 
         require BASE_PATH . '/templates/shared/failure_detail.php';
     }
@@ -811,6 +830,165 @@ class FailureController
 
         Helpers::flash('success', Helpers::e($removedName) . ' usunięty z obsady.');
         Helpers::redirect('failure_detail', ['id' => $failureId]);
+    }
+
+    // ── Zdjęcia zgłoszenia ──────────────────────────────────
+
+    public function photoUpload(): void
+    {
+        Auth::requireLogin();
+
+        if (!Auth::isMechanic()) {
+            header('Content-Type: application/json');
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Brak uprawnień.']);
+            return;
+        }
+
+        $failureId = (int)($_POST['failure_id'] ?? 0);
+        $isPublic  = ($_POST['is_public'] ?? '0') === '1' ? 1 : 0;
+
+        if (!$failureId) {
+            header('Content-Type: application/json');
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Brak ID zgłoszenia.']);
+            return;
+        }
+
+        $fm      = new FailureModel();
+        $failure = $fm->getById($failureId);
+
+        if (!$failure) {
+            header('Content-Type: application/json');
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Zgłoszenie nie istnieje.']);
+            return;
+        }
+
+        if (
+            empty($_FILES['photo']) ||
+            $_FILES['photo']['error'] !== UPLOAD_ERR_OK
+        ) {
+            header('Content-Type: application/json');
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Błąd przesyłania pliku.']);
+            return;
+        }
+
+        // Limit 6 MB przed kompresją
+        if ($_FILES['photo']['size'] > 6 * 1024 * 1024) {
+            header('Content-Type: application/json');
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Plik przekracza 6 MB.']);
+            return;
+        }
+
+        $user     = Auth::user();
+        $username = $user['login'];
+        $ticket   = $failure['ticket_number'];
+
+        $dir = BASE_PATH . '/foto/' . $username . '/' . $ticket . '/';
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        $tmpPath = $_FILES['photo']['tmp_name'];
+        $mime    = mime_content_type($tmpPath);
+
+        if ($mime === 'image/jpeg') {
+            $src = imagecreatefromjpeg($tmpPath);
+        } elseif ($mime === 'image/png') {
+            $src = imagecreatefrompng($tmpPath);
+        } elseif ($mime === 'image/webp') {
+            $src = imagecreatefromwebp($tmpPath);
+        } else {
+            $src = null;
+        }
+
+        if (!$src) {
+            header('Content-Type: application/json');
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Nieobsługiwany format obrazu (JPEG, PNG, WEBP).']);
+            return;
+        }
+
+        $w      = imagesx($src);
+        $h      = imagesy($src);
+        $maxDim = 1920;
+
+        if ($w > $maxDim || $h > $maxDim) {
+            $ratio = min($maxDim / $w, $maxDim / $h);
+            $nw    = (int) round($w * $ratio);
+            $nh    = (int) round($h * $ratio);
+            $dst   = imagecreatetruecolor($nw, $nh);
+            imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+            imagedestroy($src);
+            $src = $dst;
+        }
+
+        $filename = uniqid('', true) . '.jpg';
+        $fullPath = $dir . $filename;
+        imagejpeg($src, $fullPath, 80);
+        imagedestroy($src);
+
+        $filesize = (int) filesize($fullPath);
+        $dbPath   = 'foto/' . $username . '/' . $ticket . '/' . $filename;
+
+        $photoId = $fm->addPhoto([
+            'failure_id' => $failureId,
+            'user_id'    => (int) $user['id'],
+            'username'   => $username,
+            'filename'   => $filename,
+            'path'       => $dbPath,
+            'filesize'   => $filesize,
+            'is_public'  => $isPublic,
+        ]);
+
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success'  => true,
+            'id'       => $photoId,
+            'url'      => BASE_URL . '/foto/' . $username . '/' . $ticket . '/' . $filename,
+            'filesize' => $filesize,
+        ]);
+    }
+
+    public function photoDelete(): void
+    {
+        Auth::requireLogin();
+
+        if (!Auth::isMechanic()) {
+            header('Content-Type: application/json');
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Brak uprawnień.']);
+            return;
+        }
+
+        $photoId = (int)($_POST['photo_id'] ?? 0);
+        $user    = Auth::user();
+        $fm      = new FailureModel();
+        $photo   = $fm->getPhotoById($photoId);
+
+        // Mechanik może usunąć tylko swoje zdjęcia; admin może wszystkie
+        if (
+            !$photo ||
+            (!Auth::isAdmin() && (int)$photo['user_id'] !== (int)$user['id'])
+        ) {
+            header('Content-Type: application/json');
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Zdjęcie nie istnieje lub brak dostępu.']);
+            return;
+        }
+
+        $fullPath = BASE_PATH . '/' . $photo['path'];
+        if (file_exists($fullPath)) {
+            unlink($fullPath);
+        }
+
+        $fm->deletePhoto($photoId);
+
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true]);
     }
 }
 
