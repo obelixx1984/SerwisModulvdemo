@@ -16,6 +16,8 @@ use App\Models\{
     AssignmentModel,
     MaintenanceModel,
     ScheduleNoteModel,
+    SparePartCategoryModel,
+    SparePartModel,
     SettingsModel,
     SymptomModel
 };
@@ -376,6 +378,8 @@ class FailureController
         $statuses   = (new StatusModel())->getAll(true);
         $categories = (new CategoryModel())->getAll(true);
         $dictionary = (new DictionaryModel())->getActive();
+        $spareParts         = (new SparePartModel())->getByFailure((int)$failure['id']);
+        $sparePartCategories = (new SparePartCategoryModel())->getAll(true);
 
         // ── NOWE: obsada zgłoszenia ──────────────────────────
         $am          = new AssignmentModel();
@@ -581,6 +585,93 @@ class FailureController
         $fm->addHistory($id, $user['id'], 'comment_added', null, null, $user['name'], 'Dodano komentarz');
         Helpers::flash('success', 'Komentarz dodany.');
         Helpers::redirect('failure_detail', ['id' => $id]);
+    }
+
+    /**
+     * Dodaje część zamienną do zgłoszenia.
+     * Dostępne tylko gdy zgłoszenie nie ma statusu końcowego.
+     */
+    public function sparePartAdd(): void
+    {
+        Auth::requireLogin();
+
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('failures');
+        }
+
+        $failureId  = (int)($_POST['failure_id']  ?? 0);
+        $categoryId = (int)($_POST['category_id'] ?? 0);
+        $partName   = trim($_POST['part_name']    ?? '');
+        $quantity   = max(1, (int)($_POST['quantity'] ?? 1));
+
+        if (!$failureId || !$categoryId || !$partName) {
+            Helpers::flash('error', 'Wypełnij wszystkie wymagane pola części zamiennej.');
+            Helpers::redirect('failure_detail&id=' . $failureId);
+        }
+
+        // Sprawdź uprawnienia do zmiany statusu (mechanik / admin)
+        if (!Auth::hasPermission('statuses')) {
+            Helpers::flash('error', 'Brak uprawnień do dodawania części zamiennych.');
+            Helpers::redirect('failure_detail&id=' . $failureId);
+        }
+
+        $failure = (new FailureModel())->getById($failureId);
+        if (!$failure) {
+            Helpers::flash('error', 'Zgłoszenie nie istnieje.');
+            Helpers::redirect('failures');
+        }
+
+        // Blokada po statusie końcowym
+        if (!empty($failure['status_is_final'])) {
+            Helpers::flash('error', 'Nie można dodawać części po nadaniu statusu końcowego.');
+            Helpers::redirect('failure_detail&id=' . $failureId);
+        }
+
+        (new SparePartModel())->create([
+            'failure_id'  => $failureId,
+            'category_id' => $categoryId,
+            'part_name'   => $partName,
+            'quantity'    => $quantity,
+            'added_by'    => (int)Auth::user()['id'],
+        ]);
+
+        Helpers::flash('success', 'Część zamienna dodana.');
+        Helpers::redirect('failure_detail&id=' . $failureId);
+    }
+
+    /**
+     * Usuwa część zamienną ze zgłoszenia.
+     * Dostępne tylko dla mechanika / admina i gdy status nie jest końcowy.
+     */
+    public function sparePartDelete(): void
+    {
+        Auth::requireLogin();
+
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('failures');
+        }
+
+        $spareId   = (int)($_POST['spare_id']   ?? 0);
+        $failureId = (int)($_POST['failure_id'] ?? 0);
+
+        if (!Auth::hasPermission('statuses')) {
+            Helpers::flash('error', 'Brak uprawnień.');
+            Helpers::redirect('failure_detail&id=' . $failureId);
+        }
+
+        $failure = (new FailureModel())->getById($failureId);
+        if (!empty($failure['status_is_final'])) {
+            Helpers::flash('error', 'Nie można usuwać części po nadaniu statusu końcowego.');
+            Helpers::redirect('failure_detail&id=' . $failureId);
+        }
+
+        if ($spareId > 0) {
+            (new SparePartModel())->delete($spareId);
+            Helpers::flash('success', 'Część usunięta.');
+        }
+        Helpers::redirect('failure_detail&id=' . $failureId);
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -1860,6 +1951,80 @@ class AdminController
             Helpers::flash('success', 'Pozycja harmonogramu usunięta.');
         }
         Helpers::redirect('admin_dur_sched');
+    }
+
+    /**
+     * Widok panelu: Części zamienne — kategorie i lista wszystkich użytych części.
+     */
+    public function spareParts(): void
+    {
+        Auth::requireAdmin();
+        $categories  = (new SparePartCategoryModel())->getAll();
+        $filterCatId = !empty($_GET['cat_id']) ? (int)$_GET['cat_id'] : null;
+        $spareParts  = (new SparePartModel())->getAll($filterCatId);
+        require BASE_PATH . '/templates/admin/spare_parts.php';
+    }
+
+    /**
+     * Zapis (dodaj / edytuj) kategorii części zamiennej.
+     */
+    public function sparePartCatSave(): void
+    {
+        Auth::requireAdmin();
+
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('admin_spare_parts');
+        }
+
+        $id     = (int)($_POST['cat_id']     ?? 0);
+        $name   = trim($_POST['name']        ?? '');
+        $color  = trim($_POST['color']       ?? '#6c757d');
+        $order  = (int)($_POST['sort_order'] ?? 0);
+        $active = (int)($_POST['is_active']  ?? 1);
+
+        if (!$name) {
+            Helpers::flash('error', 'Podaj nazwę kategorii.');
+            Helpers::redirect('admin_spare_parts');
+        }
+
+        $m    = new SparePartCategoryModel();
+        $data = ['name' => $name, 'color' => $color, 'sort_order' => $order, 'is_active' => $active];
+
+        if ($id > 0) {
+            $m->update($id, $data);
+            Helpers::flash('success', 'Kategoria zaktualizowana.');
+        } else {
+            $m->create($data);
+            Helpers::flash('success', 'Kategoria "' . Helpers::e($name) . '" dodana.');
+        }
+        Helpers::redirect('admin_spare_parts');
+    }
+
+    /**
+     * Usuwa kategorię części zamiennej (blokada gdy ma przypisane części).
+     */
+    public function sparePartCatDelete(): void
+    {
+        Auth::requireAdmin();
+
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('admin_spare_parts');
+        }
+
+        $id = (int)($_POST['cat_id'] ?? 0);
+        if ($id > 0) {
+            $m     = new SparePartCategoryModel();
+            $count = $m->countUsages($id);
+            if ($count > 0) {
+                Helpers::flash('error', 'Nie można usunąć kategorii — ma przypisane ' . $count . ' część/części. Dezaktywuj ją zamiast usuwać.');
+                Helpers::redirect('admin_spare_parts');
+            }
+            $m->delete($id);
+            Helpers::flash('success', 'Kategoria usunięta.');
+        }
+        Helpers::redirect('admin_spare_parts');
     }
 }
 

@@ -1,6 +1,5 @@
 -- ============================================================
--- Moduł Serwis v2 — Schemat bazy danych
--- ZMIANA v2.4: dodano 'periodic' do ENUM typów DUR
+-- Moduł Serwis — Schemat bazy danych
 -- ============================================================
 SET NAMES utf8mb4;
 
@@ -216,7 +215,7 @@ CREATE TABLE IF NOT EXISTS `failure_history` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
--- Szablony DUR — ZMIANA v2.4: dodano 'periodic' do ENUM
+-- Szablony DUR 
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `maintenance_templates` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -241,7 +240,7 @@ CREATE TABLE IF NOT EXISTS `maintenance_templates` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
--- Harmonogram DUR — ZMIANA v2.4: dodano 'periodic' do ENUM
+-- Harmonogram DUR 
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `maintenance_schedules` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -269,7 +268,7 @@ CREATE TABLE IF NOT EXISTS `maintenance_schedules` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────
--- Raporty DUR — ZMIANA v2.4: dodano 'periodic' do ENUM
+-- Raporty DUR 
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `maintenance_reviews` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -343,6 +342,42 @@ CREATE TABLE IF NOT EXISTS `settings` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_settings_key` (`skey`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- ────────────────────────────────────────────────────────────
+-- Kategorie części zamiennych
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `spare_part_categories` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL,
+    `color` VARCHAR(7) NOT NULL DEFAULT '#6c757d',
+    `sort_order` INT UNSIGNED NOT NULL DEFAULT 0,
+    `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_spc_name` (`name`),
+    KEY `idx_spc_order` (`sort_order`),
+    KEY `idx_spc_active` (`is_active`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- ────────────────────────────────────────────────────────────
+-- Części zamienne użyte w zgłoszeniu awarii
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `failure_spare_parts` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `failure_id` INT UNSIGNED NOT NULL,
+    `category_id` INT UNSIGNED NOT NULL,
+    `part_name` VARCHAR(255) NOT NULL,
+    `quantity` INT UNSIGNED NOT NULL DEFAULT 1,
+    `added_by` INT UNSIGNED NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_fsp_failure` (`failure_id`),
+    KEY `idx_fsp_category` (`category_id`),
+    CONSTRAINT `fk_fsp_failure` FOREIGN KEY (`failure_id`) REFERENCES `failures` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_fsp_category` FOREIGN KEY (`category_id`) REFERENCES `spare_part_categories` (`id`),
+    CONSTRAINT `fk_fsp_added_by` FOREIGN KEY (`added_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

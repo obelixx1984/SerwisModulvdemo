@@ -29,6 +29,8 @@ spl_autoload_register(function (string $class): void {
             'App\\Models\\RoleModel'            => $mdl,
             'App\\Models\\ScheduleNoteModel'    => $mdl,
             'App\\Models\\AssignmentModel'      => $mdl,
+            'App\\Models\\SparePartCategoryModel' => $mdl,
+            'App\\Models\\SparePartModel'         => $mdl,
             'App\\Controllers\\AuthController'    => $ctrl,
             'App\\Controllers\\PublicController'  => $ctrl,
             'App\\Controllers\\FailureController' => $ctrl,
@@ -109,6 +111,13 @@ $routes = [
     'admin_tmpl_save'     => ['App\\Controllers\\AdminController',   'tmplSave'],
     'admin_sched_save'    => ['App\\Controllers\\AdminController',   'schedSave'],
     'check_duplicate'     => ['App\\Controllers\\AjaxController',    'checkDuplicate'],
+
+    // ── Części zamienne ──────────────────────────────────────────
+    'admin_spare_parts'         => ['App\\Controllers\\AdminController', 'spareParts'],
+    'admin_spc_cat_save'        => ['App\\Controllers\\AdminController', 'sparePartCatSave'],
+    'admin_spc_cat_delete'      => ['App\\Controllers\\AdminController', 'sparePartCatDelete'],
+    'spare_part_add'            => ['App\\Controllers\\FailureController', 'sparePartAdd'],
+    'spare_part_delete'         => ['App\\Controllers\\FailureController', 'sparePartDelete'],
 
     'ajax_note_add'    => ['App\\Controllers\\AjaxController', 'noteAdd'],
     'ajax_note_edit'   => ['App\\Controllers\\AjaxController', 'noteEdit'],

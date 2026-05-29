@@ -13,6 +13,7 @@ $year = date('Y');
   <a href="<?= BASE_URL ?>/index.php?route=admin_statuses" class="atab">Statusy</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_dictionary" class="atab">Słownik awarii</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_symptoms" class="atab">Objawy awarii</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_spare_parts" class="atab">Części zamienne</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_dur_tmpl" class="atab v">Szablony DUR</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_dur_sched" class="atab v">Harmonogram DUR</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_settings" class="atab">Ustawienia</a>

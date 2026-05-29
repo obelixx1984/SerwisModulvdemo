@@ -172,4 +172,12 @@ INSERT INTO `settings` (`skey`, `svalue`, `label`) VALUES
 ('role_perms_operator', '{"report":1,"dashboard":0,"failures":0,"dur":1,"statuses":0,"admin":0}', 'Uprawnienia roli: Operator')
 ON DUPLICATE KEY UPDATE svalue = VALUES(svalue);
 
+-- ── Przykładowe kategorie części zamiennych ──────────────────
+INSERT IGNORE INTO `spare_part_categories` (`name`, `color`, `sort_order`, `is_active`) VALUES
+('Elektryka',  '#0891b2', 1, 1),
+('Mechanika',  '#7c3aed', 2, 1),
+('Hydraulika', '#d97706', 3, 1),
+('Pneumatyka', '#dc2626', 4, 1),
+('Inne',       '#6c757d', 5, 1);
+
 SET FOREIGN_KEY_CHECKS = 1;

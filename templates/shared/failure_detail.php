@@ -407,6 +407,86 @@ $mechanics   = $mechanics   ?? [];
       </div>
     <?php endif; /* koniec canEdit — kategoria */ ?>
 
+    <!-- ══ Karta: Części zamienne ═══════════════════════════════════ -->
+    <div class="card mb2">
+      <div class="card-head"><span class="card-title">🔧 Części zamienne</span></div>
+      <div class="card-body">
+
+        <?php if (!empty($spareParts)): ?>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #e5e7eb;">Część</th>
+                <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #e5e7eb;">Ilość</th>
+                <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #e5e7eb;">Kategoria</th>
+                <?php if ($canEdit && empty($failure['status_is_final'])): ?>
+                  <th style="padding:4px 8px;border-bottom:1px solid #e5e7eb;"></th>
+                <?php endif; ?>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($spareParts as $sp): ?>
+                <tr>
+                  <td style="padding:4px 8px;"><?= Helpers::e($sp['part_name']) ?></td>
+                  <td style="padding:4px 8px;"><?= (int)$sp['quantity'] ?></td>
+                  <td style="padding:4px 8px;"><?= Helpers::catBadge($sp['category_name'], $sp['category_color']) ?></td>
+                  <?php if ($canEdit && empty($failure['status_is_final'])): ?>
+                    <td style="padding:4px 8px;">
+                      <form method="POST" action="<?= BASE_URL ?>/index.php?route=spare_part_delete"
+                        style="display:inline;"
+                        onsubmit="return confirm('Usunąć tę część?');">
+                        <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
+                        <input type="hidden" name="spare_id" value="<?= $sp['id'] ?>">
+                        <input type="hidden" name="failure_id" value="<?= $failure['id'] ?>">
+                        <button type="submit" class="btn btn-sm" style="border-color:#fca5a5;color:#dc2626;">Usuń</button>
+                      </form>
+                    </td>
+                  <?php endif; ?>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        <?php else: ?>
+          <p class="muted fs-sm" style="margin:0 0 12px;">Brak dodanych części zamiennych.</p>
+        <?php endif; ?>
+
+        <!-- Formularz dodawania — tylko gdy canEdit i status nie jest końcowy -->
+        <?php if ($canEdit && empty($failure['status_is_final'])): ?>
+          <form method="POST" action="<?= BASE_URL ?>/index.php?route=spare_part_add"
+            style="display:grid;grid-template-columns:1fr 80px 200px auto;gap:8px;align-items:end;">
+            <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
+            <input type="hidden" name="failure_id" value="<?= $failure['id'] ?>">
+            <div>
+              <label class="flbl" style="font-size:.75rem;">Nazwa części <span class="req">*</span></label>
+              <input class="fc" name="part_name" placeholder="np. Uszczelka pompy" required>
+            </div>
+            <div>
+              <label class="flbl" style="font-size:.75rem;">Ilość</label>
+              <input class="fc" type="number" name="quantity" value="1" min="1" required>
+            </div>
+            <div>
+              <label class="flbl" style="font-size:.75rem;">Kategoria <span class="req">*</span></label>
+              <select class="fc" name="category_id" required>
+                <option value="">— Wybierz —</option>
+                <?php foreach ($sparePartCategories as $spc): ?>
+                  <option value="<?= $spc['id'] ?>"><?= Helpers::e($spc['name']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div>
+              <button type="submit" class="btn btn-p btn-sm">Dodaj</button>
+            </div>
+          </form>
+        <?php elseif (!empty($failure['status_is_final'])): ?>
+          <p class="muted fs-sm" style="margin:4px 0 0;">
+            Zgłoszenie jest zamknięte — nie można dodawać ani usuwać części.
+          </p>
+        <?php endif; ?>
+
+      </div>
+    </div>
+    <!-- ══ Koniec karty: Części zamienne ══════════════════════════ -->
+
     <?php /* ZMIANA: formularz zmiany statusu — tylko gdy canEdit */ ?>
     <?php if ($canEdit): ?>
       <div class="card mb2">

@@ -1453,3 +1453,105 @@ class ScheduleNoteModel extends BaseModel
         return $result;
     }
 }
+
+// ────────────────────────────────────────────────────────────
+class SparePartCategoryModel extends BaseModel
+{
+    /** Pobiera wszystkie kategorie (opcjonalnie tylko aktywne) */
+    public function getAll(bool $activeOnly = false): array
+    {
+        $sql = 'SELECT * FROM spare_part_categories';
+        if ($activeOnly) $sql .= ' WHERE is_active = 1';
+        $sql .= ' ORDER BY sort_order, name';
+        return $this->fetchAll($sql);
+    }
+
+    /** Tworzy nową kategorię i zwraca jej ID */
+    public function create(array $d): int
+    {
+        return $this->execute(
+            'INSERT INTO spare_part_categories (name, color, sort_order, is_active) VALUES (?,?,?,?)',
+            [$d['name'], $d['color'] ?? '#6c757d', $d['sort_order'] ?? 0, $d['is_active'] ?? 1]
+        );
+    }
+
+    /** Aktualizuje istniejącą kategorię */
+    public function update(int $id, array $d): void
+    {
+        $this->execute(
+            'UPDATE spare_part_categories SET name=?, color=?, sort_order=?, is_active=? WHERE id=?',
+            [$d['name'], $d['color'] ?? '#6c757d', $d['sort_order'] ?? 0, $d['is_active'] ?? 1, $id]
+        );
+    }
+
+    /** Usuwa kategorię (tylko jeśli nie ma przypisanych części) */
+    public function delete(int $id): void
+    {
+        $this->execute('DELETE FROM spare_part_categories WHERE id=?', [$id]);
+    }
+
+    /** Sprawdza ile części jest przypisanych do kategorii */
+    public function countUsages(int $id): int
+    {
+        $pdo = \App\Helpers\Database::get();
+        $st  = $pdo->prepare('SELECT COUNT(*) FROM failure_spare_parts WHERE category_id=?');
+        $st->execute([$id]);
+        return (int)$st->fetchColumn();
+    }
+}
+
+// ────────────────────────────────────────────────────────────
+class SparePartModel extends BaseModel
+{
+    /** Pobiera części dla danego zgłoszenia */
+    public function getByFailure(int $failureId): array
+    {
+        return $this->fetchAll(
+            'SELECT fsp.*, spc.name AS category_name, spc.color AS category_color,
+                    u.name AS added_by_name
+             FROM failure_spare_parts fsp
+             JOIN spare_part_categories spc ON spc.id = fsp.category_id
+             LEFT JOIN users u ON u.id = fsp.added_by
+             WHERE fsp.failure_id = ?
+             ORDER BY fsp.created_at',
+            [$failureId]
+        );
+    }
+
+    /** Dodaje nową część do zgłoszenia, zwraca ID */
+    public function create(array $d): int
+    {
+        return $this->execute(
+            'INSERT INTO failure_spare_parts (failure_id, category_id, part_name, quantity, added_by)
+             VALUES (?,?,?,?,?)',
+            [$d['failure_id'], $d['category_id'], $d['part_name'], $d['quantity'] ?? 1, $d['added_by'] ?? null]
+        );
+    }
+
+    /** Usuwa konkretną część */
+    public function delete(int $id): void
+    {
+        $this->execute('DELETE FROM failure_spare_parts WHERE id=?', [$id]);
+    }
+
+    /**
+     * Pobiera wszystkie części z filtrami dla admina.
+     * @param int|null $categoryId  Filtr według kategorii (null = wszystkie)
+     */
+    public function getAll(?int $categoryId = null): array
+    {
+        $sql    = 'SELECT fsp.*, spc.name AS category_name, spc.color AS category_color,
+                          f.ticket_number, u.name AS added_by_name
+                   FROM failure_spare_parts fsp
+                   JOIN spare_part_categories spc ON spc.id = fsp.category_id
+                   JOIN failures f ON f.id = fsp.failure_id
+                   LEFT JOIN users u ON u.id = fsp.added_by';
+        $params = [];
+        if ($categoryId !== null) {
+            $sql   .= ' WHERE fsp.category_id = ?';
+            $params[] = $categoryId;
+        }
+        $sql .= ' ORDER BY fsp.created_at DESC';
+        return $this->fetchAll($sql, $params);
+    }
+}

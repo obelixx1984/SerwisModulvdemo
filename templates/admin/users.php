@@ -1,5 +1,7 @@
 <?php
+
 use App\Helpers\Helpers;
+
 $pageTitle = 'Użytkownicy systemu';
 require BASE_PATH . '/templates/shared/header.php';
 ?>
@@ -8,93 +10,99 @@ require BASE_PATH . '/templates/shared/header.php';
 <div class="atabs mb2">
   <button class="atab active" onclick="showUsersTab('users',this)">Użytkownicy</button>
   <button class="atab" onclick="showUsersTab('roles',this)">Role i uprawnienia</button>
-  <a href="<?= BASE_URL ?>/index.php?route=admin_lines"     class="atab">Linie i podzespoły</a>
-  <a href="<?= BASE_URL ?>/index.php?route=admin_statuses"  class="atab">Statusy</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_lines" class="atab">Linie i podzespoły</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_statuses" class="atab">Statusy</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_dictionary" class="atab">Słownik awarii</a>
-  <a href="<?= BASE_URL ?>/index.php?route=admin_symptoms"   class="atab">Objawy awarii</a>
-  <a href="<?= BASE_URL ?>/index.php?route=admin_dur_tmpl"  class="atab v">Szablony DUR</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_symptoms" class="atab">Objawy awarii</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_spare_parts" class="atab">Części zamienne</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_dur_tmpl" class="atab v">Szablony DUR</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_dur_sched" class="atab v">Harmonogram DUR</a>
-  <a href="<?= BASE_URL ?>/index.php?route=admin_settings"  class="atab">Ustawienia</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_settings" class="atab">Ustawienia</a>
 </div>
 
 <div id="panel-users">
-<div class="g2">
-  <!-- Tabela użytkowników -->
-  <div class="card">
-    <div class="card-head"><span class="card-title">Użytkownicy systemu</span></div>
-    <div class="twrap">
-      <table>
-        <thead><tr>
-          <th>Imię i nazwisko</th>
-          <th>Login</th>
-          <th>Email</th>
-          <th>Rola</th>
-          <th>Aktywny</th>
-          <th></th>
-        </tr></thead>
-        <tbody>
-        <?php foreach ($users as $u): ?>
-        <tr>
-          <td class="fw6"><?= Helpers::e($u['name']) ?></td>
-          <td class="mono fs-sm" style="color:#0a2463;font-weight:700;"><?= Helpers::e($u['login']) ?></td>
-          <td class="muted fs-sm"><?= Helpers::e($u['email']) ?></td>
-          <td><?= Helpers::statusBadge($u['role_label'], $u['role_name'] === 'admin' ? '#0a2463' : '#1e3a8a') ?></td>
-          <td><?= Helpers::statusBadge($u['is_active'] ? 'Tak' : 'Nie', $u['is_active'] ? '#16a34a' : '#6b7280') ?></td>
-          <td>
-            <button class="btn btn-sm" onclick="editUser(<?= $u['id'] ?>,'<?= Helpers::e($u['name']) ?>','<?= Helpers::e($u['login']) ?>','<?= Helpers::e($u['email']) ?>','<?= $u['role_name'] ?>',<?= $u['is_active'] ?>)">
-              Edytuj
-            </button>
-            <form method="POST" action="<?= BASE_URL ?>/index.php?route=admin_user_delete" style="display:inline;" onsubmit="return confirm('Usunąć użytkownika <?= Helpers::e($u['name']) ?>?');">
-              <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
-              <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
-              <button type="submit" class="btn btn-sm" style="border-color:#fca5a5;color:#dc2626;">Usuń</button>
-            </form>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Formularz nowego / edycji -->
-  <div class="card">
-    <div class="card-head"><span class="card-title" id="userFormTitle">Nowy użytkownik</span></div>
-    <div class="card-body">
-      <form method="POST" action="<?= BASE_URL ?>/index.php?route=admin_user_save">
-        <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
-        <input type="hidden" name="user_id" id="userId" value="0">
-        <div class="fg"><label class="flbl">Imię i nazwisko</label><input class="fc" name="name" id="uName" placeholder="Jan Kowalski"></div>
-        <div class="fg">
-          <label class="flbl">Nickname <span class="req">*</span></label>
-          <input class="fc" name="nickname" id="uNick" placeholder="np. jkowalski">
-          <span class="fhint">Używany do logowania zamiast e-mail</span>
-        </div>
-        <div class="fg"><label class="flbl">Email</label><input class="fc" name="email" id="uEmail" type="email" placeholder="jan@firma.pl"></div>
-        <div class="fg">
-          <label class="flbl">Rola</label>
-          <select class="fc" name="role" id="uRole">
-            <?php foreach ($roles as $r): ?>
-            <option value="<?= $r['name'] ?>"><?= Helpers::e($r['label']) ?></option>
+  <div class="g2">
+    <!-- Tabela użytkowników -->
+    <div class="card">
+      <div class="card-head"><span class="card-title">Użytkownicy systemu</span></div>
+      <div class="twrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Imię i nazwisko</th>
+              <th>Login</th>
+              <th>Email</th>
+              <th>Rola</th>
+              <th>Aktywny</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($users as $u): ?>
+              <tr>
+                <td class="fw6"><?= Helpers::e($u['name']) ?></td>
+                <td class="mono fs-sm" style="color:#0a2463;font-weight:700;"><?= Helpers::e($u['login']) ?></td>
+                <td class="muted fs-sm"><?= Helpers::e($u['email']) ?></td>
+                <td><?= Helpers::statusBadge($u['role_label'], $u['role_name'] === 'admin' ? '#0a2463' : '#1e3a8a') ?></td>
+                <td><?= Helpers::statusBadge($u['is_active'] ? 'Tak' : 'Nie', $u['is_active'] ? '#16a34a' : '#6b7280') ?></td>
+                <td>
+                  <button class="btn btn-sm" onclick="editUser(<?= $u['id'] ?>,'<?= Helpers::e($u['name']) ?>','<?= Helpers::e($u['login']) ?>','<?= Helpers::e($u['email']) ?>','<?= $u['role_name'] ?>',<?= $u['is_active'] ?>)">
+                    Edytuj
+                  </button>
+                  <form method="POST" action="<?= BASE_URL ?>/index.php?route=admin_user_delete" style="display:inline;" onsubmit="return confirm('Usunąć użytkownika <?= Helpers::e($u['name']) ?>?');">
+                    <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
+                    <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
+                    <button type="submit" class="btn btn-sm" style="border-color:#fca5a5;color:#dc2626;">Usuń</button>
+                  </form>
+                </td>
+              </tr>
             <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="fg"><label class="flbl">Hasło <span class="req" id="passReq">*</span></label>
-          <input class="fc" name="password" id="uPass" type="password" placeholder="••••••••">
-          <span class="fhint" id="passHint">Wymagane przy dodawaniu nowego użytkownika</span>
-        </div>
-        <div class="fg">
-          <label class="flbl">Aktywny</label>
-          <select class="fc" name="is_active" id="uActive"><option value="1">Tak</option><option value="0">Nie</option></select>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button type="submit" class="btn btn-p btn-sm">Zapisz użytkownika</button>
-          <button type="button" class="btn btn-sm" onclick="resetUserForm()">Nowy</button>
-        </div>
-      </form>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Formularz nowego / edycji -->
+    <div class="card">
+      <div class="card-head"><span class="card-title" id="userFormTitle">Nowy użytkownik</span></div>
+      <div class="card-body">
+        <form method="POST" action="<?= BASE_URL ?>/index.php?route=admin_user_save">
+          <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
+          <input type="hidden" name="user_id" id="userId" value="0">
+          <div class="fg"><label class="flbl">Imię i nazwisko</label><input class="fc" name="name" id="uName" placeholder="Jan Kowalski"></div>
+          <div class="fg">
+            <label class="flbl">Nickname <span class="req">*</span></label>
+            <input class="fc" name="nickname" id="uNick" placeholder="np. jkowalski">
+            <span class="fhint">Używany do logowania zamiast e-mail</span>
+          </div>
+          <div class="fg"><label class="flbl">Email</label><input class="fc" name="email" id="uEmail" type="email" placeholder="jan@firma.pl"></div>
+          <div class="fg">
+            <label class="flbl">Rola</label>
+            <select class="fc" name="role" id="uRole">
+              <?php foreach ($roles as $r): ?>
+                <option value="<?= $r['name'] ?>"><?= Helpers::e($r['label']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="fg"><label class="flbl">Hasło <span class="req" id="passReq">*</span></label>
+            <input class="fc" name="password" id="uPass" type="password" placeholder="••••••••">
+            <span class="fhint" id="passHint">Wymagane przy dodawaniu nowego użytkownika</span>
+          </div>
+          <div class="fg">
+            <label class="flbl">Aktywny</label>
+            <select class="fc" name="is_active" id="uActive">
+              <option value="1">Tak</option>
+              <option value="0">Nie</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button type="submit" class="btn btn-p btn-sm">Zapisz użytkownika</button>
+            <button type="button" class="btn btn-sm" onclick="resetUserForm()">Nowy</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
-</div>
 </div><!-- /#panel-users -->
 
 <!-- Sekcja: Role i uprawnienia -->
@@ -104,42 +112,49 @@ require BASE_PATH . '/templates/shared/header.php';
       <div class="card-head"><span class="card-title">Zdefiniowane role</span></div>
       <div class="twrap">
         <table>
-          <thead><tr><th>Rola</th><th>Etykieta</th><th>Uprawnienia</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>Rola</th>
+              <th>Etykieta</th>
+              <th>Uprawnienia</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody>
-          <?php foreach ($roles as $r):
-            $perms = $rolePerms[$r['name']] ?? [];
-          ?>
-          <tr>
-            <td class="mono fw6 fs-sm"><?= Helpers::e($r['name']) ?></td>
-            <td><?= Helpers::e($r['label']) ?></td>
-            <td class="fs-sm muted">
-              <?php
-              $labels = [];
-              if (!empty($perms['report']))    $labels[] = 'Zgłaszanie awarii';
-              if (!empty($perms['dashboard'])) $labels[] = 'Pulpit';
-              if (!empty($perms['failures']))  $labels[] = 'Lista zgłoszeń';
-              if (!empty($perms['dur']))       $labels[] = 'Przeglądy DUR';
-              if (!empty($perms['statuses']))  $labels[] = 'Zarządzanie statusami';
-              if (!empty($perms['admin']))     $labels[] = 'Panel administratora';
-              echo $labels ? implode(', ', $labels) : '—';
-              ?>
-            </td>
-            <td>
-              <button class="btn btn-sm" onclick="editRole('<?= Helpers::e($r['name']) ?>','<?= Helpers::e($r['label']) ?>')">Edytuj</button>
-              <?php if (!in_array($r['name'], ['admin','mechanic','operator'])): ?>
-              <form method="POST" action="<?= BASE_URL ?>/index.php?route=admin_role_delete"
-                    style="display:inline;"
-                    onsubmit="return confirm('Usunąć rolę &quot;<?= Helpers::e($r['label']) ?>&quot;? Użytkownicy z tą rolą zostaną przeniesieni do roli &quot;operator&quot;.');">
-                <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
-                <input type="hidden" name="role_name" value="<?= Helpers::e($r['name']) ?>">
-                <button type="submit" class="btn btn-sm" style="border-color:#fca5a5;color:#dc2626;">Usuń</button>
-              </form>
-              <?php else: ?>
-              <span class="muted fs-sm" style="margin-left:4px;" title="Rola wbudowana — nie można usunąć">🔒</span>
-              <?php endif; ?>
-            </td>
-          </tr>
-          <?php endforeach; ?>
+            <?php foreach ($roles as $r):
+              $perms = $rolePerms[$r['name']] ?? [];
+            ?>
+              <tr>
+                <td class="mono fw6 fs-sm"><?= Helpers::e($r['name']) ?></td>
+                <td><?= Helpers::e($r['label']) ?></td>
+                <td class="fs-sm muted">
+                  <?php
+                  $labels = [];
+                  if (!empty($perms['report']))    $labels[] = 'Zgłaszanie awarii';
+                  if (!empty($perms['dashboard'])) $labels[] = 'Pulpit';
+                  if (!empty($perms['failures']))  $labels[] = 'Lista zgłoszeń';
+                  if (!empty($perms['dur']))       $labels[] = 'Przeglądy DUR';
+                  if (!empty($perms['statuses']))  $labels[] = 'Zarządzanie statusami';
+                  if (!empty($perms['admin']))     $labels[] = 'Panel administratora';
+                  echo $labels ? implode(', ', $labels) : '—';
+                  ?>
+                </td>
+                <td>
+                  <button class="btn btn-sm" onclick="editRole('<?= Helpers::e($r['name']) ?>','<?= Helpers::e($r['label']) ?>')">Edytuj</button>
+                  <?php if (!in_array($r['name'], ['admin', 'mechanic', 'operator'])): ?>
+                    <form method="POST" action="<?= BASE_URL ?>/index.php?route=admin_role_delete"
+                      style="display:inline;"
+                      onsubmit="return confirm('Usunąć rolę &quot;<?= Helpers::e($r['label']) ?>&quot;? Użytkownicy z tą rolą zostaną przeniesieni do roli &quot;operator&quot;.');">
+                      <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
+                      <input type="hidden" name="role_name" value="<?= Helpers::e($r['name']) ?>">
+                      <button type="submit" class="btn btn-sm" style="border-color:#fca5a5;color:#dc2626;">Usuń</button>
+                    </form>
+                  <?php else: ?>
+                    <span class="muted fs-sm" style="margin-left:4px;" title="Rola wbudowana — nie można usunąć">🔒</span>
+                  <?php endif; ?>
+                </td>
+              </tr>
+            <?php endforeach; ?>
           </tbody>
         </table>
       </div>
@@ -219,53 +234,57 @@ require BASE_PATH . '/templates/shared/header.php';
 </div>
 
 <script>
-function showUsersTab(tab, btn) {
-  document.getElementById('panel-users').style.display = tab === 'users' ? '' : 'none';
-  document.getElementById('panel-roles').style.display = tab === 'roles' ? '' : 'none';
-  document.querySelectorAll('.atabs .atab').forEach(function(b){ b.classList.remove('active'); });
-  btn.classList.add('active');
-}
-<?php
-$rolePermsJs = json_encode($rolePerms);
-?>
-var ROLE_PERMS = <?= $rolePermsJs ?>;
-function editRole(name, label) {
-  document.getElementById('roleName').value        = name;
-  document.getElementById('roleNameDisplay').value = name;
-  document.getElementById('roleLabel').value       = label;
-  var p = ROLE_PERMS[name] || {};
-  document.getElementById('pReport').checked  = !!p.report;
-  document.getElementById('pDash').checked    = !!p.dashboard;
-  document.getElementById('pFail').checked    = !!p.failures;
-  document.getElementById('pDur').checked     = !!p.dur;
-  document.getElementById('pStatus').checked  = !!p.statuses;
-  document.getElementById('pAdmin').checked   = !!p.admin;
-  document.getElementById('roleFormTitle').textContent = 'Edytuj rolę: ' + label;
-}
+  function showUsersTab(tab, btn) {
+    document.getElementById('panel-users').style.display = tab === 'users' ? '' : 'none';
+    document.getElementById('panel-roles').style.display = tab === 'roles' ? '' : 'none';
+    document.querySelectorAll('.atabs .atab').forEach(function(b) {
+      b.classList.remove('active');
+    });
+    btn.classList.add('active');
+  }
+  <?php
+  $rolePermsJs = json_encode($rolePerms);
+  ?>
+  var ROLE_PERMS = <?= $rolePermsJs ?>;
+
+  function editRole(name, label) {
+    document.getElementById('roleName').value = name;
+    document.getElementById('roleNameDisplay').value = name;
+    document.getElementById('roleLabel').value = label;
+    var p = ROLE_PERMS[name] || {};
+    document.getElementById('pReport').checked = !!p.report;
+    document.getElementById('pDash').checked = !!p.dashboard;
+    document.getElementById('pFail').checked = !!p.failures;
+    document.getElementById('pDur').checked = !!p.dur;
+    document.getElementById('pStatus').checked = !!p.statuses;
+    document.getElementById('pAdmin').checked = !!p.admin;
+    document.getElementById('roleFormTitle').textContent = 'Edytuj rolę: ' + label;
+  }
 </script>
 
 <script>
-function editUser(id, name, nick, email, role, active) {
-  document.getElementById('userId').value = id;
-  document.getElementById('uName').value  = name;
-  document.getElementById('uNick').value  = nick;
-  document.getElementById('uEmail').value = email;
-  document.getElementById('uRole').value  = role;
-  document.getElementById('uActive').value = active;
-  document.getElementById('userFormTitle').textContent = 'Edytuj użytkownika';
-  document.getElementById('passReq').style.display = 'none';
-  document.getElementById('passHint').textContent = 'Pozostaw puste aby nie zmieniać hasła';
-}
-function resetUserForm() {
-  document.getElementById('userId').value = '0';
-  document.getElementById('uName').value  = '';
-  document.getElementById('uNick').value  = '';
-  document.getElementById('uEmail').value = '';
-  document.getElementById('uPass').value  = '';
-  document.getElementById('userFormTitle').textContent = 'Nowy użytkownik';
-  document.getElementById('passReq').style.display = '';
-  document.getElementById('passHint').textContent = 'Wymagane przy dodawaniu nowego użytkownika';
-}
+  function editUser(id, name, nick, email, role, active) {
+    document.getElementById('userId').value = id;
+    document.getElementById('uName').value = name;
+    document.getElementById('uNick').value = nick;
+    document.getElementById('uEmail').value = email;
+    document.getElementById('uRole').value = role;
+    document.getElementById('uActive').value = active;
+    document.getElementById('userFormTitle').textContent = 'Edytuj użytkownika';
+    document.getElementById('passReq').style.display = 'none';
+    document.getElementById('passHint').textContent = 'Pozostaw puste aby nie zmieniać hasła';
+  }
+
+  function resetUserForm() {
+    document.getElementById('userId').value = '0';
+    document.getElementById('uName').value = '';
+    document.getElementById('uNick').value = '';
+    document.getElementById('uEmail').value = '';
+    document.getElementById('uPass').value = '';
+    document.getElementById('userFormTitle').textContent = 'Nowy użytkownik';
+    document.getElementById('passReq').style.display = '';
+    document.getElementById('passHint').textContent = 'Wymagane przy dodawaniu nowego użytkownika';
+  }
 </script>
 
 <?php require BASE_PATH . '/templates/shared/footer.php'; ?>

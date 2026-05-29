@@ -34,7 +34,7 @@ $typeLabels = $typeLabels ?? [];
 
 // Nadpisz nazwy niestandardowymi etykietami admina
 foreach ($typeLabels as $k => $v) {
-    if (isset($allTypes[$k]) && $v !== '') $allTypes[$k] = $v;
+  if (isset($allTypes[$k]) && $v !== '') $allTypes[$k] = $v;
 }
 
 ?>
@@ -45,6 +45,7 @@ foreach ($typeLabels as $k => $v) {
   <a href="<?= BASE_URL ?>/index.php?route=admin_statuses" class="atab">Statusy</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_dictionary" class="atab">Słownik awarii</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_symptoms" class="atab">Objawy awarii</a>
+  <a href="<?= BASE_URL ?>/index.php?route=admin_spare_parts" class="atab">Części zamienne</a>
   <button class="atab v active">Szablony DUR</button>
   <a href="<?= BASE_URL ?>/index.php?route=admin_dur_sched" class="atab v">Harmonogram DUR</a>
   <a href="<?= BASE_URL ?>/index.php?route=admin_settings" class="atab">Ustawienia</a>

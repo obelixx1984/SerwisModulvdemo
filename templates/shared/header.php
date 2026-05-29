@@ -97,6 +97,7 @@ $adminRoutes = [
   'admin_dictionary',
   'admin_symptoms',
   'admin_dur_tmpl',
+  'admin_spare_parts',
   'admin_dur_sched',
   'admin_settings'
 ];
