@@ -29,3 +29,9 @@ if (APP_DEBUG) {
     ini_set('display_errors', '0');
     error_reporting(0);
 }
+
+define('BRIDGE_URL',     'https://liczbapi.pl/finco/api.php');
+define('BRIDGE_API_KEY', '103c5f772bd54e7a9f78abca729b3bcf');
+
+define('BRIDGE_SERVICE_LOGIN', 'service');
+define('BRIDGE_SERVICE_PASS',  'kamkar84*');

@@ -38,6 +38,13 @@ use function mkdir;
 use function file_exists;
 use function unlink;
 
+use function curl_init;
+use function curl_setopt_array;
+use function curl_exec;
+use function curl_close;
+use function bin2hex;
+use function random_bytes;
+
 // ────────────────────────────────────────────────────────────
 class AuthController
 {
@@ -951,6 +958,138 @@ class FailureController
             'url'      => BASE_URL . '/foto/' . $username . '/' . $ticket . '/' . $filename,
             'filesize' => $filesize,
         ]);
+    }
+
+    public function photoBridgeQr(): void
+    {
+        Auth::requireLogin();
+        if (!Auth::isMechanic()) {
+            header('Content-Type: application/json');
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Brak uprawnień.']);
+            return;
+        }
+        $failureId = (int)($_POST['failure_id'] ?? 0);
+        if (!$failureId) {
+            header('Content-Type: application/json');
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Brak ID zgłoszenia.']);
+            return;
+        }
+        $fm      = new FailureModel();
+        $failure = $fm->getById($failureId);
+        if (!$failure) {
+            header('Content-Type: application/json');
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Zgłoszenie nie istnieje.']);
+            return;
+        }
+        $user  = Auth::user();
+        $bm    = new \App\Models\BridgeModel();
+        $token = $bm->generateQrToken($user['login'], $failure['ticket_number']);
+        if (!$token) {
+            header('Content-Type: application/json');
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Błąd połączenia z mostem.']);
+            return;
+        }
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success'  => true,
+            'qr_token' => $token,
+            'ticket'   => $failure['ticket_number'],
+        ]);
+    }
+
+    public function photoCheckNew(): void
+    {
+        Auth::requireLogin();
+
+        $failureId = (int)($_GET['failure_id'] ?? 0);
+        $since     = (int)($_GET['since'] ?? 0);
+
+        if (!$failureId) {
+            header('Content-Type: application/json');
+            echo json_encode(['count' => 0, 'total' => 0]);
+            return;
+        }
+
+        // Pobierz nowe zdjęcia z Mostu i zapisz do zgłoszenia
+        $bm = new \App\Models\BridgeModel();
+        if ($bm->login()) {
+            $photos = $bm->getPhotos();
+            if (!empty($photos)) {
+                $fm   = new FailureModel();
+                $fail = $fm->getById($failureId);
+                $user = Auth::user();
+
+                foreach ($photos as $photo) {
+                    $dl = $bm->downloadPhoto((int)$photo['id']);
+                    if (empty($dl['body'])) continue;
+
+                    $ticket   = $fail['ticket_number'];
+                    $username = $user['login'];
+                    $dir      = BASE_PATH . '/foto/' . $username . '/' . $ticket . '/';
+
+                    if (!\is_dir($dir)) \mkdir($dir, 0755, true);
+
+                    // Kompresja przez GD
+                    $tmp = \tempnam(\sys_get_temp_dir(), 'bridge_');
+                    \file_put_contents($tmp, $dl['body']);
+                    $mime = \mime_content_type($tmp);
+
+                    if ($mime === 'image/jpeg') {
+                        $src = \imagecreatefromjpeg($tmp);
+                    } elseif ($mime === 'image/png') {
+                        $src = \imagecreatefrompng($tmp);
+                    } elseif ($mime === 'image/webp') {
+                        $src = \imagecreatefromwebp($tmp);
+                    } else {
+                        $src = null;
+                    }
+
+                    \unlink($tmp);
+                    if (!$src) continue;
+
+                    $w = \imagesx($src);
+                    $h = \imagesy($src);
+                    $maxDim = 1920;
+                    if ($w > $maxDim || $h > $maxDim) {
+                        $ratio = min($maxDim / $w, $maxDim / $h);
+                        $nw = (int)round($w * $ratio);
+                        $nh = (int)round($h * $ratio);
+                        $dst = \imagecreatetruecolor($nw, $nh);
+                        \imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+                        \imagedestroy($src);
+                        $src = $dst;
+                    }
+
+                    $filename = \uniqid('mob_', true) . '.jpg';
+                    $fullPath = $dir . $filename;
+                    \imagejpeg($src, $fullPath, 80);
+                    \imagedestroy($src);
+
+                    $fm->addPhoto([
+                        'failure_id' => $failureId,
+                        'user_id'    => (int)$user['id'],
+                        'username'   => $username,
+                        'filename'   => $filename,
+                        'path'       => 'foto/' . $username . '/' . $ticket . '/' . $filename,
+                        'filesize'   => (int)\filesize($fullPath),
+                        'is_public'  => (int)$photo['is_public'],
+                    ]);
+                }
+            }
+        }
+
+        // Zwróć aktualną liczbę zdjęć
+        $canEdit   = Auth::isMechanic();
+        $fm        = new FailureModel();
+        $allPhotos = $fm->getPhotos($failureId, !$canEdit);
+        $newPhotos = \array_filter($allPhotos, fn($p) => \strtotime($p['created_at']) > $since);
+
+        header('Content-Type: application/json');
+        echo json_encode(['count' => count($newPhotos), 'total' => count($allPhotos)]);
     }
 
     public function photoDelete(): void

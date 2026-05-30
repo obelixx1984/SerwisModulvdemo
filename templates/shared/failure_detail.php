@@ -625,6 +625,25 @@ $mechanics   = $mechanics   ?? [];
             </div>
             <div style="font-size:.8rem;color:#888;margin-top:4px;">JPEG, PNG · maks. 6 MB na plik · zmniejszane automatycznie do 1920 px</div>
           </div>
+
+          <div style="margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <button type="button" id="qrBtn"
+              style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;font-size:13px;border:0.5px solid #ccc;border-radius:6px;cursor:pointer;background:#fff;">
+              📱 Dodaj telefonem (QR)
+            </button>
+            <span style="font-size:12px;color:#999;">Link ważny 15 minut</span>
+          </div>
+
+          <div id="qrPanel" style="display:none;margin-top:14px;padding:16px;border:0.5px solid #ddd;border-radius:8px;background:#fafafa;text-align:center;">
+            <p style="font-size:13px;color:#555;margin-bottom:12px;">Zeskanuj aparatem telefonu:</p>
+            <canvas id="qrCanvas"></canvas>
+            <p style="font-size:11px;color:#aaa;margin-top:10px;" id="qrExpiry"></p>
+            <button type="button" id="qrClose"
+              style="margin-top:8px;font-size:12px;color:#888;background:none;border:0;cursor:pointer;text-decoration:underline;">
+              Zamknij
+            </button>
+          </div>
+
           <input type="file" id="photoFileInput" accept="image/jpeg,image/png,image/webp" multiple style="display:none;">
 
           <div class="mt1" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
@@ -1113,6 +1132,84 @@ $mechanics   = $mechanics   ?? [];
     });
 
     /* ═══════════════════════════════════════════
+     QR kod
+    ═══════════════════════════════════════════ */
+    const qrBtn = document.getElementById('qrBtn');
+    const qrPanel = document.getElementById('qrPanel');
+    const qrClose = document.getElementById('qrClose');
+
+    if (qrBtn) {
+      qrBtn.addEventListener('click', async function() {
+        qrBtn.disabled = true;
+        qrBtn.textContent = 'Generowanie…';
+
+        const fd = new FormData();
+        fd.append('failure_id', FAILURE_ID);
+
+        try {
+          const res = await fetch('<?= BASE_URL ?>/index.php?route=photo_bridge_qr', {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin'
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            qrPanel.style.display = 'block';
+            const canvas = document.getElementById('qrCanvas');
+            QRCode.toCanvas(canvas, data.qr_token, {
+              width: 200,
+              margin: 2
+            }, function(err) {
+              if (err) console.error(err);
+            });
+            const exp = new Date(Date.now() + 15 * 60 * 1000);
+            document.getElementById('qrExpiry').textContent =
+              'Link wygasa o ' + exp.getHours() + ':' + String(exp.getMinutes()).padStart(2, '0');
+            startPolling();
+          } else {
+            alert(data.message || 'Błąd generowania QR.');
+          }
+        } catch (e) {
+          alert('Błąd połączenia z mostem.');
+        }
+
+        qrBtn.disabled = false;
+        qrBtn.innerHTML = '📱 Dodaj telefonem (QR)';
+      });
+
+      if (qrClose) {
+        qrClose.addEventListener('click', function() {
+          qrPanel.style.display = 'none';
+        });
+      }
+    }
+
+    /* ═══════════════════════════════════════════
+       Polling — auto-odświeżanie
+    ═══════════════════════════════════════════ */
+    let pollInterval = null;
+    let lastPhotoTime = Math.floor(Date.now() / 1000);
+
+    function startPolling() {
+      if (pollInterval) return;
+      pollInterval = setInterval(async function() {
+        try {
+          const res = await fetch(
+            '<?= BASE_URL ?>/index.php?route=photo_check_new&failure_id=' + FAILURE_ID + '&since=' + lastPhotoTime, {
+              credentials: 'same-origin'
+            }
+          );
+          const data = await res.json();
+          if (data.count > 0) {
+            lastPhotoTime = Math.floor(Date.now() / 1000);
+            window.location.reload();
+          }
+        } catch (_) {}
+      }, 5000);
+    }
+
+    /* ═══════════════════════════════════════════
        Upload
     ═══════════════════════════════════════════ */
     const FAILURE_ID = <?= (int)$failure['id'] ?>;
@@ -1239,5 +1336,7 @@ $mechanics   = $mechanics   ?? [];
 
   })();
 </script>
+
+<script src="<?= BASE_URL ?>/assets/js/qrcode.min.js"></script>
 
 <?php require BASE_PATH . '/templates/shared/footer.php'; ?>
