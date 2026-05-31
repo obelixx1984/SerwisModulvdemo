@@ -237,7 +237,8 @@ class AdminController
         $order   = (int)($_POST['sort_order'] ?? 99);
         $active  = (int)($_POST['is_active'] ?? 1);
         $initial = (int)($_POST['is_initial'] ?? 0);
-        $final   = (int)($_POST['is_final'] ?? 0);
+        $final    = (int)($_POST['is_final']    ?? 0);
+        $observed = (int)($_POST['is_observed'] ?? 0);
 
         if (!$label) {
             Helpers::flash('error', 'Podaj etykietę statusu.');
@@ -246,12 +247,13 @@ class AdminController
 
         $sm   = new StatusModel();
         $data = [
-            'label' => $label,
-            'color' => $color,
-            'sort_order' => $order,
-            'is_active' => $active,
-            'is_initial' => $initial,
-            'is_final' => $final
+            'label'       => $label,
+            'color'       => $color,
+            'sort_order'  => $order,
+            'is_active'   => $active,
+            'is_initial'  => $initial,
+            'is_final'    => $final,
+            'is_observed' => $observed,
         ];
         if ($id > 0) {
             $sm->update($id, $data);
@@ -617,6 +619,8 @@ class AdminController
         $sm->set('records_per_page', (string)max(5, (int)($_POST['records_per_page'] ?? 25)));
         $idleMinutes = max(0, (int)($_POST['session_idle_timeout'] ?? 5));
         $sm->set('session_idle_timeout', (string)$idleMinutes);
+        $obsHours = max(1, min(168, (int)($_POST['observation_window_hours'] ?? 8)));
+        $sm->set('observation_window_hours', (string)$obsHours);
         Helpers::flash('success', 'Ustawienia zapisane.');
         Helpers::redirect('admin_settings');
     }

@@ -27,11 +27,15 @@ if (!empty($statuses)) {
   }
 }
 // ─────────────────────────────────────────────────────────────
-$symptoms = $symptoms ?? []; // fallback gdy kontroler nie przekazał
-$assignments = $assignments ?? [];  // ← dodaj tę linię
-$isLeader    = $isLeader    ?? false;
-$hasLeader   = $hasLeader   ?? false;
-$mechanics   = $mechanics   ?? [];
+$symptoms           = $symptoms           ?? [];
+$assignments        = $assignments        ?? [];
+$isLeader           = $isLeader           ?? false;
+$hasLeader          = $hasLeader          ?? false;
+$mechanics          = $mechanics          ?? [];
+$observationNotes       = $observationNotes       ?? [];
+$isObservationActive    = $isObservationActive    ?? false;
+$observationSecondsLeft = $observationSecondsLeft ?? 0;
+$hasAnyObservationNotes = $hasAnyObservationNotes ?? false;
 ?>
 
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
@@ -156,6 +160,171 @@ $mechanics   = $mechanics   ?? [];
         </div>
       </div>
     </div>
+
+    <?php if (!empty($failure['status_is_observed'])): ?>
+      <?php
+      // Oblicz datę wygaśnięcia do wyświetlenia
+      $obsExpires = '';
+      if (!empty($failure['observation_started_at'])) {
+        $obsExpires = date('d.m.Y H:i', strtotime($failure['observation_started_at']) + ($observationWindowHours ?? 8) * 3600);
+      }
+      ?>
+      <div class="card mb2" style="border-color:<?= $isObservationActive ? '#FAC775' : '#F09595' ?>;">
+        <div class="card-head" style="background:<?= $isObservationActive ? '#FAEEDA' : '#FCEBEB' ?>;">
+          <span class="card-title" style="color:<?= $isObservationActive ? '#854F0B' : '#A32D2D' ?>;">
+            ⏱ Okno obserwacji
+          </span>
+          <?php if ($isObservationActive): ?>
+            <span class="badge" style="background:#FAC775;color:#854F0B;">Aktywne</span>
+          <?php else: ?>
+            <span class="badge" style="background:#F09595;color:#A32D2D;">Zakończone</span>
+          <?php endif; ?>
+        </div>
+        <div class="card-body">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:48px;height:48px;border-radius:50%;
+                        background:<?= $isObservationActive ? '#FAC775' : '#F09595' ?>;
+                        display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">
+              <?= $isObservationActive ? '⏳' : '🔒' ?>
+            </div>
+            <div style="flex:1;">
+              <?php if ($isObservationActive): ?>
+                <div style="font-size:11px;color:#BA7517;margin-bottom:2px;">Pozostały czas na uwagi</div>
+                <div id="obsCountdown" style="font-size:28px;font-weight:700;color:#854F0B;font-variant-numeric:tabular-nums;line-height:1;">
+                  --:--:--
+                </div>
+                <div style="height:5px;background:#FAC775;border-radius:4px;margin-top:6px;overflow:hidden;">
+                  <div id="obsProgressBar" style="height:100%;background:#854F0B;border-radius:4px;transition:width 1s linear;"></div>
+                </div>
+              <?php else: ?>
+                <div style="font-size:11px;color:#A32D2D;margin-bottom:2px;">Czas obserwacji upłynął</div>
+                <div style="font-size:22px;font-weight:700;color:#A32D2D;line-height:1;">00:00:00</div>
+              <?php endif; ?>
+            </div>
+            <div style="text-align:right;font-size:11px;color:<?= $isObservationActive ? '#BA7517' : '#A32D2D' ?>;">
+              <?php if ($obsExpires): ?>
+                <?= $isObservationActive ? 'Upływa:' : 'Wygasło:' ?><br>
+                <strong><?= Helpers::e($obsExpires) ?></strong>
+              <?php endif; ?>
+            </div>
+          </div>
+        </div>
+      </div>
+    <?php endif; ?>
+
+    <?php
+    $showObservationCard   = !empty($failure['status_is_observed']) || $hasAnyObservationNotes;
+    $isObservationArchived = empty($failure['status_is_observed']) && $hasAnyObservationNotes;
+    ?>
+    <?php if ($showObservationCard): ?>
+      <div class="card mb2" style="border-color:<?= $isObservationArchived ? '#d1d5db' : '#F09595' ?>;">
+
+        <div class="card-head" style="background:<?= $isObservationArchived ? '#f3f4f6' : '#FCEBEB' ?>;">
+          <span class="card-title" style="color:<?= $isObservationArchived ? '#374151' : '#A32D2D' ?>;">
+            <?= $isObservationArchived ? '📋 Uwagi zgłoszone podczas obserwacji' : '💬 Uwagi do obserwacji' ?>
+          </span>
+          <?php if (!empty($observationNotes)): ?>
+            <span class="badge" style="background:<?= $isObservationArchived ? '#e5e7eb' : '#F09595' ?>;color:<?= $isObservationArchived ? '#374151' : '#7F1D1D' ?>;">
+              <?= count($observationNotes) ?>
+            </span>
+          <?php endif; ?>
+        </div>
+
+        <?php if ($isObservationArchived): ?>
+          <!-- Pasek z przyciskiem rozwijania -->
+          <div style="padding:10px 16px;border-bottom:0.5px solid #e5e7eb;">
+            <button type="button"
+              onclick="toggleArchivedNotes(this)"
+              style="width:100%;display:flex;align-items:center;justify-content:space-between;
+                     background:none;border:none;cursor:pointer;font-size:13px;color:#6b7280;padding:0;">
+              <span id="archivedNotesLabel">Pokaż uwagi (<?= count($observationNotes) ?>)</span>
+              <span id="archivedNotesArrow" style="font-size:16px;transition:transform .25s;">▼</span>
+            </button>
+          </div>
+          <div id="archivedNotesBody" style="display:none;">
+          <?php endif; ?>
+
+          <div class="card-body" style="background:<?= $isObservationArchived ? '#fafafa' : '#fff8f8' ?>;">
+
+            <?php if (!empty($observationNotes)): ?>
+              <?php foreach ($observationNotes as $on): ?>
+                <?php
+                $canDeleteNote = !$isObservationArchived && $isObservationActive &&
+                  ((int)$on['user_id'] === (int)$user['id'] || \App\Helpers\Auth::isAdmin());
+                ?>
+                <div style="padding:10px 12px;margin-bottom:8px;border-radius:6px;
+                          background:<?= $isObservationArchived ? '#f3f4f6' : '#FCEBEB' ?>;
+                          border-left:3px solid <?= $isObservationArchived ? '#d1d5db' : '#F09595' ?>;">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+                    <div>
+                      <strong style="font-size:12px;color:<?= $isObservationArchived ? '#374151' : '#7F1D1D' ?>;">
+                        <?= Helpers::e($on['user_name']) ?>
+                      </strong>
+                      <span style="font-size:11px;color:<?= $isObservationArchived ? '#6b7280' : '#A32D2D' ?>;margin-left:8px;">
+                        <?= Helpers::formatDate($on['created_at']) ?>
+                      </span>
+                    </div>
+                    <?php if ($canDeleteNote): ?>
+                      <form method="POST" action="<?= BASE_URL ?>/index.php?route=delete_observation_note"
+                        style="margin:0;" onsubmit="return confirm('Usunąć tę uwagę?')">
+                        <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
+                        <input type="hidden" name="note_id" value="<?= (int)$on['id'] ?>">
+                        <input type="hidden" name="failure_id" value="<?= (int)$failure['id'] ?>">
+                        <button type="submit" class="btn btn-sm"
+                          style="padding:2px 8px;font-size:11px;color:#A32D2D;border-color:#F09595;">
+                          ✕ Usuń
+                        </button>
+                      </form>
+                    <?php endif; ?>
+                  </div>
+                  <p style="font-size:13px;line-height:1.5;color:#374151;margin:0;">
+                    <?= nl2br(Helpers::e($on['note'])) ?>
+                  </p>
+                </div>
+              <?php endforeach; ?>
+            <?php else: ?>
+              <p style="font-size:13px;color:<?= $isObservationArchived ? '#6b7280' : '#A32D2D' ?>;opacity:.7;margin:0 0 8px;">
+                Brak uwag do obserwacji.
+              </p>
+            <?php endif; ?>
+
+            <?php if (!$isObservationArchived): ?>
+              <?php if ($isObservationActive): ?>
+                <div class="sep" style="border-color:#F7C1C1;"></div>
+                <form method="POST" action="<?= BASE_URL ?>/index.php?route=add_observation_note">
+                  <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
+                  <input type="hidden" name="failure_id" value="<?= $failure['id'] ?>">
+                  <div class="fg mb1">
+                    <label class="flbl" style="color:#A32D2D;">Dodaj uwagę do obserwacji</label>
+                    <textarea name="note" class="fc" rows="3"
+                      style="border-color:#F09595;"
+                      placeholder="Opisz obserwowane zachowanie maszyny..." required></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-sm"
+                    style="background:#A32D2D;color:#fff;border-color:#A32D2D;">
+                    Dodaj uwagę
+                  </button>
+                </form>
+              <?php else: ?>
+                <div class="sep" style="border-color:#F7C1C1;"></div>
+                <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
+                          background:#F7C1C1;border-radius:6px;">
+                  <span style="font-size:14px;">🔒</span>
+                  <span style="font-size:12px;color:#7F1D1D;font-weight:500;">
+                    Czas obserwacji upłynął — dodawanie uwag zostało zablokowane.
+                  </span>
+                </div>
+              <?php endif; ?>
+            <?php endif; ?>
+
+          </div>
+
+          <?php if ($isObservationArchived): ?>
+          </div><!-- koniec archivedNotesBody -->
+        <?php endif; ?>
+
+      </div>
+    <?php endif; ?>
 
     <!-- Komentarze serwisowe -->
     <div class="card mb2">
@@ -1335,6 +1504,56 @@ $mechanics   = $mechanics   ?? [];
     });
 
   })();
+
+  /* ══ Licznik obserwacji ══════════════════════════════════════ */
+  (function() {
+    var countdown = document.getElementById('obsCountdown');
+    var progressBar = document.getElementById('obsProgressBar');
+    if (!countdown) return; // nie ma licznika na stronie — pomiń
+
+    var secondsLeft = <?= (int)$observationSecondsLeft ?>;
+    var totalSeconds = <?= (int)(($observationWindowHours ?? 8) * 3600) ?>;
+
+    function pad(n) {
+      return String(n).padStart(2, '0');
+    }
+
+    function updateCountdown() {
+      if (secondsLeft <= 0) {
+        countdown.textContent = '00:00:00';
+        if (progressBar) progressBar.style.width = '0%';
+        // Przeładuj stronę — licznik wygasł, interfejs musi się zmienić
+        window.location.reload();
+        return;
+      }
+      var h = Math.floor(secondsLeft / 3600);
+      var m = Math.floor((secondsLeft % 3600) / 60);
+      var s = secondsLeft % 60;
+      countdown.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
+      if (progressBar) {
+        var pct = Math.round((secondsLeft / totalSeconds) * 100);
+        progressBar.style.width = pct + '%';
+      }
+      secondsLeft--;
+    }
+
+    updateCountdown(); // natychmiastowe pierwsze wywołanie bez czekania 1s
+    setInterval(updateCountdown, 1000);
+  })();
+
+  /* ══ Rozwijana karta archiwalnych uwag obserwacji ════════════ */
+  function toggleArchivedNotes(btn) {
+    var body = document.getElementById('archivedNotesBody');
+    var arrow = document.getElementById('archivedNotesArrow');
+    var label = document.getElementById('archivedNotesLabel');
+    if (!body) return;
+    var isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+    label.textContent = isOpen ?
+      'Pokaż uwagi (<?= count($observationNotes) ?>)' :
+      'Ukryj uwagi (<?= count($observationNotes) ?>)';
+  }
 </script>
 
 <script src="<?= BASE_URL ?>/assets/js/qrcode.min.js"></script>

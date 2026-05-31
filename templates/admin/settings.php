@@ -73,6 +73,16 @@ require BASE_PATH . '/templates/shared/header.php';
         </span>
       </div>
 
+      <div class="fg">
+        <label class="flbl">Czas okna obserwacji awarii (godziny)</label>
+        <input class="fc" type="number" name="observation_window_hours" min="1" max="168" style="width:100px;"
+          value="<?= Helpers::e($settings['observation_window_hours']['svalue'] ?? '8') ?>">
+        <span class="fhint">
+          Po ustawieniu statusu z flagą "Obserwacja" użytkownicy mogą dodawać uwagi przez ten czas.
+          Po jego upłynięciu formularz zostaje zablokowany. Zakres: 1–168 godzin (1 tydzień).
+        </span>
+      </div>
+
       <div class="sep"></div>
       <button type="submit" class="btn btn-p">Zapisz ustawienia</button>
     </form>

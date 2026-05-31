@@ -90,13 +90,14 @@ INSERT IGNORE INTO `failure_dictionary` (`id`, `category_id`, `title`) VALUES
 -- ────────────────────────────────────────────────────────────
 -- Statusy zgłoszeń
 -- ────────────────────────────────────────────────────────────
-INSERT IGNORE INTO `failure_statuses` (`id`, `label`, `color`, `sort_order`, `is_initial`, `is_final`, `is_active`) VALUES
-(1, 'Nowa awaria',        '#dc2626', 1, 1, 0, 1),
-(2, 'Przyjęta',           '#d97706', 2, 0, 0, 1),
-(3, 'W trakcie naprawy',  '#0a2463', 3, 0, 0, 1),
-(4, 'Oczekuje na części', '#7c3aed', 4, 0, 0, 1),
-(5, 'Naprawiona',         '#16a34a', 5, 0, 0, 1),
-(6, 'Zamknięta',          '#374151', 6, 0, 1, 1);
+INSERT IGNORE INTO `failure_statuses` (`id`, `label`, `color`, `sort_order`, `is_initial`, `is_final`, `is_observed`, `is_active`) VALUES
+(1, 'Nowa awaria',           '#dc2626', 1, 1, 0, 0, 1),
+(2, 'Przyjęta',              '#d97706', 2, 0, 0, 0, 1),
+(3, 'W trakcie naprawy',     '#0a2463', 3, 0, 0, 0, 1),
+(4, 'Oczekuje na części',    '#7c3aed', 4, 0, 0, 0, 1),
+(5, 'W trakcie obserwacji',  '#b45309', 5, 0, 0, 1, 1),
+(6, 'Naprawiona',            '#16a34a', 6, 0, 0, 0, 1),
+(7, 'Zamknięta',             '#374151', 7, 0, 1, 0, 1);
 
 -- ────────────────────────────────────────────────────────────
 -- Objawy awarii — wybierane przez zgłaszającego
@@ -155,12 +156,13 @@ INSERT IGNORE INTO `maintenance_templates` (`id`, `name`, `review_type`, `checkl
 -- Ustawienia systemowe
 -- ────────────────────────────────────────────────────────────
 INSERT INTO `settings` (`skey`, `svalue`, `label`) VALUES
-('app_name',         'Moduł Serwis',      'Nazwa aplikacji'),
-('app_version',      '0.1-dev',           'Wersja systemu'),
-('company_name',     'FINCO Stal Serwis', 'Nazwa firmy'),
-('dur_warning_days', '7',                 'Ostrzeżenie DUR (dni przed terminem)'),
-('records_per_page', '25',                'Liczba rekordów na stronę')
-('session_idle_timeout', '5',             'Czas bezczynności przed wylogowaniem (minuty, 0 = wyłączone)'),
+('app_name',                  'Moduł Serwis',      'Nazwa aplikacji'),
+('app_version',               '0.1-dev',           'Wersja systemu'),
+('company_name',              'FINCO Stal Serwis', 'Nazwa firmy'),
+('dur_warning_days',          '7',                 'Ostrzeżenie DUR (dni przed terminem)'),
+('records_per_page',          '25',                'Liczba rekordów na stronę'),
+('session_idle_timeout',      '5',                 'Czas bezczynności przed wylogowaniem (minuty, 0 = wyłączone)'),
+('observation_window_hours',  '8',                 'Czas okna obserwacji awarii (godziny)')
 ON DUPLICATE KEY UPDATE svalue = VALUES(svalue);
 
 -- ────────────────────────────────────────────────────────────

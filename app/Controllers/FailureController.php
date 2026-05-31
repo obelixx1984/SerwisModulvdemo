@@ -115,6 +115,22 @@ class FailureController
         $history    = $fm->getHistory($id);
         $comments   = $fm->getComments($id);
         $statuses   = (new StatusModel())->getAll(true);
+        $observationNotes      = $fm->getObservationNotes($id);
+        $hasAnyObservationNotes = !empty($observationNotes);
+
+        // Oblicz czy okno obserwacji jest aktywne i ile sekund pozostało
+        $observationWindowHours = (int)((new SettingsModel())->get('observation_window_hours') ?? 8);
+        $observationSecondsLeft = 0;
+        $isObservationActive    = false;
+        if (!empty($failure['status_is_observed']) && !empty($failure['observation_started_at'])) {
+            $startedAt   = strtotime($failure['observation_started_at']);
+            $expiresAt   = $startedAt + ($observationWindowHours * 3600);
+            $remaining   = $expiresAt - time();
+            if ($remaining > 0) {
+                $isObservationActive    = true;
+                $observationSecondsLeft = $remaining;
+            }
+        }
         $categories = (new CategoryModel())->getAll(true);
         $dictionary = (new DictionaryModel())->getActive();
         $spareParts         = (new SparePartModel())->getByFailure((int)$failure['id']);
@@ -212,7 +228,7 @@ class FailureController
         $am->addMember($id, (int)$user['id'], $user['name'], $isFirst);
         // ─────────────────────────────────────────────────────
 
-        $fm->changeStatus($id, $newStatusId, (bool)$newStatus['is_final']);
+        $fm->changeStatus($id, $newStatusId, (bool)$newStatus['is_final'], (bool)($newStatus['is_observed'] ?? false));
         $fm->addHistory(
             $id,
             $user['id'],
@@ -327,6 +343,81 @@ class FailureController
         $fm->addHistory($id, $user['id'], 'comment_added', null, null, $user['name'], 'Dodano komentarz');
         Helpers::flash('success', 'Komentarz dodany.');
         Helpers::redirect('failure_detail', ['id' => $id]);
+    }
+
+    public function addObservationNote(): void
+    {
+        Auth::requireLogin();
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('failures');
+        }
+        $id   = (int)($_POST['failure_id'] ?? 0);
+        $note = trim($_POST['note'] ?? '');
+        if (!$id || !$note) {
+            Helpers::flash('error', 'Uwaga nie może być pusta.');
+            Helpers::redirect('failure_detail', ['id' => $id]);
+        }
+
+        $fm      = new FailureModel();
+        $failure = $fm->getById($id);
+        if (!$failure) {
+            Helpers::redirect('failures');
+        }
+
+        // Sprawdź czy okno obserwacji jest nadal aktywne
+        $windowHours = (int)((new SettingsModel())->get('observation_window_hours') ?? 8);
+        $startedAt   = strtotime($failure['observation_started_at'] ?? '');
+        $expiresAt   = $startedAt + ($windowHours * 3600);
+        if (empty($failure['status_is_observed']) || !$startedAt || time() > $expiresAt) {
+            Helpers::flash('error', 'Czas okna obserwacji upłynął — nie można dodawać uwag.');
+            Helpers::redirect('failure_detail', ['id' => $id]);
+        }
+
+        $user = Auth::user();
+        $fm->addObservationNote($id, (int)$user['id'], $user['name'], $note);
+        Helpers::flash('success', 'Uwaga dodana.');
+        Helpers::redirect('failure_detail', ['id' => $id]);
+    }
+
+    public function deleteObservationNote(): void
+    {
+        Auth::requireLogin();
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('failures');
+        }
+        $noteId    = (int)($_POST['note_id']    ?? 0);
+        $failureId = (int)($_POST['failure_id'] ?? 0);
+
+        $fm   = new FailureModel();
+        $note = $fm->getObservationNoteById($noteId);
+
+        if (!$note || (int)$note['failure_id'] !== $failureId) {
+            Helpers::flash('error', 'Nie znaleziono uwagi.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+        }
+
+        // Tylko autor uwagi lub administrator może usunąć
+        $user = Auth::user();
+        if ((int)$note['user_id'] !== (int)$user['id'] && !Auth::isAdmin()) {
+            Helpers::flash('error', 'Możesz usuwać tylko własne uwagi.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+        }
+
+        // Sprawdź czy okno obserwacji jest nadal aktywne
+        $failure     = $fm->getById($failureId);
+        $windowHours = (int)((new SettingsModel())->get('observation_window_hours') ?? 8);
+        $startedAt   = strtotime($failure['observation_started_at'] ?? '');
+        $expiresAt   = $startedAt + ($windowHours * 3600);
+        if (empty($failure['status_is_observed']) || !$startedAt || time() > $expiresAt) {
+            Helpers::flash('error', 'Czas obserwacji upłynął — nie można usuwać uwag.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+        }
+
+        $fm->deleteObservationNote($noteId);
+        Helpers::flash('success', 'Uwaga usunięta.');
+        Helpers::redirect('failure_detail', ['id' => $failureId]);
     }
 
     /**

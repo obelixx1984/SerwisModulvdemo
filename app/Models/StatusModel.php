@@ -24,6 +24,11 @@ class StatusModel extends BaseModel
         return $this->fetchAll("SELECT * FROM failure_statuses WHERE is_final = 1 AND is_active = 1");
     }
 
+    public function getObserved(): ?array
+    {
+        return $this->fetchOne("SELECT * FROM failure_statuses WHERE is_observed = 1 AND is_active = 1 LIMIT 1");
+    }
+
     public function getById(int $id): ?array
     {
         return $this->fetchOne("SELECT * FROM failure_statuses WHERE id = ?", [$id]);
@@ -32,21 +37,22 @@ class StatusModel extends BaseModel
     public function create(array $d): int
     {
         return $this->execute(
-            "INSERT INTO failure_statuses (label, color, sort_order, is_initial, is_final, is_active) VALUES (?, ?, ?, ?, ?, ?)",
-            [$d['label'], $d['color'] ?? '#6c757d', $d['sort_order'] ?? 99, 0, 0, 1]
+            "INSERT INTO failure_statuses (label, color, sort_order, is_initial, is_final, is_observed, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [$d['label'], $d['color'] ?? '#6c757d', $d['sort_order'] ?? 99, 0, 0, 0, 1]
         );
     }
 
     public function update(int $id, array $d): void
     {
         $this->execute(
-            "UPDATE failure_statuses SET label = ?, color = ?, sort_order = ?, is_initial = ?, is_final = ?, is_active = ? WHERE id = ?",
+            "UPDATE failure_statuses SET label = ?, color = ?, sort_order = ?, is_initial = ?, is_final = ?, is_observed = ?, is_active = ? WHERE id = ?",
             [
                 $d['label'],
                 $d['color'],
                 $d['sort_order'],
                 $d['is_initial'] ?? 0,
                 $d['is_final'] ?? 0,
+                $d['is_observed'] ?? 0,
                 $d['is_active'],
                 $id
             ]

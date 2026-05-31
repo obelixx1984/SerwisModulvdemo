@@ -34,6 +34,7 @@ require BASE_PATH . '/templates/shared/header.php';
             <th>Kolejność</th>
             <th>Startowy</th>
             <th>Końcowy</th>
+            <th>Obserwacja</th>
             <th>Aktywny</th>
             <th></th>
           </tr>
@@ -50,7 +51,8 @@ require BASE_PATH . '/templates/shared/header.php';
               </td>
               <td class="muted fs-sm"><?= $s['sort_order'] ?></td>
               <td><?= $s['is_initial'] ? '✓' : '—' ?></td>
-              <td><?= $s['is_final']   ? '✓' : '—' ?></td>
+              <td><?= $s['is_final']     ? '✓' : '—' ?></td>
+              <td><?= $s['is_observed']  ? '⏱' : '—' ?></td>
               <td><?= Helpers::statusBadge($s['is_active'] ? 'Tak' : 'Nie', $s['is_active'] ? '#16a34a' : '#6b7280') ?></td>
               <td>
                 <button class="btn btn-sm" onclick="editStatus(
@@ -60,7 +62,8 @@ require BASE_PATH . '/templates/shared/header.php';
               <?= $s['sort_order'] ?>,
               <?= $s['is_active'] ?>,
               <?= $s['is_initial'] ?>,
-              <?= $s['is_final'] ?>
+              <?= $s['is_final'] ?>,
+              <?= $s['is_observed'] ?>
             )">Edytuj</button>
                 <?php if (!$s['is_initial'] && !$s['is_final']): ?>
                   <form method="POST" action="<?= BASE_URL ?>/index.php?route=admin_status_delete" style="display:inline;" onsubmit="return confirm('Usunąć status <?= Helpers::e(addslashes($s['label'])) ?>?');">
@@ -121,6 +124,14 @@ require BASE_PATH . '/templates/shared/header.php';
         </div>
 
         <div class="fg">
+          <label class="flbl">Obserwacja z licznikiem <span class="fhint" style="display:inline;">(okno uwag po zmianie statusu)</span></label>
+          <select class="fc" name="is_observed" id="nsObserved">
+            <option value="0">Nie</option>
+            <option value="1">Tak</option>
+          </select>
+        </div>
+
+        <div class="fg">
           <label class="flbl">Aktywny</label>
           <select class="fc" name="is_active" id="nsActive">
             <option value="1">Tak</option>
@@ -143,7 +154,7 @@ require BASE_PATH . '/templates/shared/header.php';
     document.getElementById('nsPreview').textContent = this.value;
   });
 
-  function editStatus(id, label, color, order, active, isInitial, isFinal) {
+  function editStatus(id, label, color, order, active, isInitial, isFinal, isObserved) {
     document.getElementById('statusId').value = id;
     document.getElementById('nsLabel').value = label;
     document.getElementById('nsColor').value = color;
@@ -151,6 +162,7 @@ require BASE_PATH . '/templates/shared/header.php';
     document.getElementById('nsActive').value = active;
     document.getElementById('nsInitial').value = isInitial || 0;
     document.getElementById('nsFinal').value = isFinal || 0;
+    document.getElementById('nsObserved').value = isObserved || 0;
     document.getElementById('nsPreview').style.background = color;
     document.getElementById('nsPreview').textContent = label;
     document.getElementById('statusFormTitle').textContent = 'Edytuj status';
@@ -164,6 +176,7 @@ require BASE_PATH . '/templates/shared/header.php';
     document.getElementById('nsActive').value = '1';
     document.getElementById('nsInitial').value = '0';
     document.getElementById('nsFinal').value = '0';
+    document.getElementById('nsObserved').value = '0';
     document.getElementById('nsPreview').style.background = '#6b7280';
     document.getElementById('nsPreview').textContent = 'Podgląd statusu';
     document.getElementById('statusFormTitle').textContent = 'Dodaj nowy status';

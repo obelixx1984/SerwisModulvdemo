@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS `failure_statuses` (
     `sort_order` INT UNSIGNED NOT NULL DEFAULT 0,
     `is_initial` TINYINT(1) NOT NULL DEFAULT 0,
     `is_final` TINYINT(1) NOT NULL DEFAULT 0,
+    `is_observed` TINYINT(1) NOT NULL DEFAULT 0,
     `is_active` TINYINT(1) NOT NULL DEFAULT 1,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -143,6 +144,7 @@ CREATE TABLE IF NOT EXISTS `failures` (
     `reporter_user_id` INT UNSIGNED NULL,
     `description` TEXT NULL,
     `closed_at` DATETIME NULL,
+    `observation_started_at` DATETIME NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
@@ -212,6 +214,23 @@ CREATE TABLE IF NOT EXISTS `failure_history` (
     CONSTRAINT `fk_history_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_history_old_status` FOREIGN KEY (`old_status_id`) REFERENCES `failure_statuses` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_history_new_status` FOREIGN KEY (`new_status_id`) REFERENCES `failure_statuses` (`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- ────────────────────────────────────────────────────────────
+-- Uwagi do obserwacji awarii
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `failure_observation_notes` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `failure_id` INT UNSIGNED NOT NULL,
+    `user_id` INT UNSIGNED NOT NULL,
+    `user_name` VARCHAR(150) NOT NULL,
+    `note` TEXT NOT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_obs_notes_failure` (`failure_id`),
+    KEY `idx_obs_notes_user` (`user_id`),
+    CONSTRAINT `fk_obs_notes_failure` FOREIGN KEY (`failure_id`) REFERENCES `failures` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_obs_notes_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────────────────

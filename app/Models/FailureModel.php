@@ -16,7 +16,7 @@ class FailureModel extends BaseModel
             pl.name AS line_name, pl.prefix AS line_prefix,
             ls.name AS subsystem_name,
             fc.label AS cat_label, fc.color AS cat_color,
-            fs.label AS status_label, fs.color AS status_color, fs.is_final AS status_is_final,
+            fs.label AS status_label, fs.color AS status_color, fs.is_final AS status_is_final, fs.is_observed AS status_is_observed,
             fd.title AS dict_title,
             fsym.name AS symptom_name
          FROM failures f
@@ -165,11 +165,12 @@ class FailureModel extends BaseModel
         );
     }
 
-    public function changeStatus(int $id, int $newStatusId, bool $isFinal): void
+    public function changeStatus(int $id, int $newStatusId, bool $isFinal, bool $isObserved = false): void
     {
-        $closed = $isFinal ? 'closed_at = NOW(),' : '';
+        $closed      = $isFinal    ? 'closed_at = NOW(),' : '';
+        $observation = $isObserved ? 'observation_started_at = NOW(),' : 'observation_started_at = NULL,';
         $this->execute(
-            "UPDATE failures SET status_id = ?, $closed updated_at = NOW() WHERE id = ?",
+            "UPDATE failures SET status_id = ?, $closed $observation updated_at = NOW() WHERE id = ?",
             [$newStatusId, $id]
         );
     }
@@ -424,6 +425,41 @@ class FailureModel extends BaseModel
     {
         $this->execute("DELETE FROM failure_photos WHERE id = ?", [$photoId]);
     }
+
+    // ── Uwagi do obserwacji ──────────────────────────────────
+
+    public function getObservationNotes(int $failureId): array
+    {
+        return $this->fetchAll(
+            "SELECT * FROM failure_observation_notes WHERE failure_id = ? ORDER BY created_at ASC",
+            [$failureId]
+        );
+    }
+
+    public function addObservationNote(int $failureId, int $userId, string $userName, string $note): int
+    {
+        return $this->execute(
+            "INSERT INTO failure_observation_notes (failure_id, user_id, user_name, note) VALUES (?, ?, ?, ?)",
+            [$failureId, $userId, $userName, $note]
+        );
+    }
+
+    public function deleteObservationNote(int $noteId): void
+    {
+        $this->execute(
+            "DELETE FROM failure_observation_notes WHERE id = ?",
+            [$noteId]
+        );
+    }
+
+    public function getObservationNoteById(int $noteId): ?array
+    {
+        return $this->fetchOne(
+            "SELECT * FROM failure_observation_notes WHERE id = ?",
+            [$noteId]
+        );
+    }
 }
 
 // ────────────────────────────────────────────────────────────
+
