@@ -59,4 +59,70 @@ class SparePartModel extends BaseModel
         $sql .= ' ORDER BY fsp.created_at DESC';
         return $this->fetchAll($sql, $params);
     }
+
+    /** Pobiera części dla danego przeglądu DUR */
+    public function getByReview(int $reviewId): array
+    {
+        return $this->fetchAll(
+            'SELECT dsp.*, spc.name AS category_name, spc.color AS category_color,
+                u.name AS added_by_name
+         FROM dur_spare_parts dsp
+         JOIN spare_part_categories spc ON spc.id = dsp.category_id
+         LEFT JOIN users u ON u.id = dsp.added_by
+         WHERE dsp.review_id = ?
+         ORDER BY dsp.created_at',
+            [$reviewId]
+        );
+    }
+
+    /** Dodaje nową część do przeglądu DUR, zwraca ID */
+    public function createForReview(array $d): int
+    {
+        return $this->execute(
+            'INSERT INTO dur_spare_parts (review_id, category_id, part_name, quantity, added_by)
+         VALUES (?,?,?,?,?)',
+            [$d['review_id'], $d['category_id'], $d['part_name'], $d['quantity'] ?? 1, $d['added_by'] ?? null]
+        );
+    }
+
+    /** Usuwa konkretną część z przeglądu DUR */
+    public function deleteFromReview(int $id): void
+    {
+        $this->execute('DELETE FROM dur_spare_parts WHERE id=?', [$id]);
+    }
+
+    /** Pobiera wszystkie części z DUR dla admina z opcjonalnymi filtrami */
+    public function getAllFromReviews(?int $categoryId = null, ?int $lineId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $sql = 'SELECT dsp.*, spc.name AS category_name, spc.color AS category_color,
+                   mr.review_date, mr.production_line_id,
+                   pl.name AS line_name, ls.name AS subsystem_name,
+                   u.name AS added_by_name
+            FROM dur_spare_parts dsp
+            JOIN spare_part_categories spc ON spc.id = dsp.category_id
+            JOIN maintenance_reviews mr ON mr.id = dsp.review_id
+            JOIN production_lines pl ON pl.id = mr.production_line_id
+            LEFT JOIN line_subsystems ls ON ls.id = mr.subsystem_id
+            LEFT JOIN users u ON u.id = dsp.added_by
+            WHERE 1=1';
+        $params = [];
+        if ($categoryId !== null) {
+            $sql .= ' AND dsp.category_id = ?';
+            $params[] = $categoryId;
+        }
+        if ($lineId !== null) {
+            $sql .= ' AND mr.production_line_id = ?';
+            $params[] = $lineId;
+        }
+        if ($dateFrom) {
+            $sql .= ' AND mr.review_date >= ?';
+            $params[] = $dateFrom;
+        }
+        if ($dateTo) {
+            $sql .= ' AND mr.review_date <= ?';
+            $params[] = $dateTo;
+        }
+        $sql .= ' ORDER BY mr.review_date DESC, dsp.created_at';
+        return $this->fetchAll($sql, $params);
+    }
 }

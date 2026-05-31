@@ -783,9 +783,14 @@ class AdminController
     public function spareParts(): void
     {
         Auth::requireAdmin();
-        $categories  = (new SparePartCategoryModel())->getAll();
-        $filterCatId = !empty($_GET['cat_id']) ? (int)$_GET['cat_id'] : null;
-        $spareParts  = (new SparePartModel())->getAll($filterCatId);
+        $categories   = (new SparePartCategoryModel())->getAll();
+        $filterCatId  = !empty($_GET['cat_id'])   ? (int)$_GET['cat_id']  : null;
+        $filterLineId = !empty($_GET['line_id'])  ? (int)$_GET['line_id'] : null;
+        $filterFrom   = !empty($_GET['date_from']) ? $_GET['date_from']    : null;
+        $filterTo     = !empty($_GET['date_to'])   ? $_GET['date_to']      : null;
+        $spareParts   = (new SparePartModel())->getAll($filterCatId);
+        $durSpareParts = (new SparePartModel())->getAllFromReviews($filterCatId, $filterLineId, $filterFrom, $filterTo);
+        $lines        = (new ProductionLineModel())->getAll(true);
         require BASE_PATH . '/templates/admin/spare_parts.php';
     }
 
@@ -850,6 +855,7 @@ class AdminController
         }
         Helpers::redirect('admin_spare_parts');
     }
+
 }
 
 // ── Endpoint AJAX: sprawdź duplikat usterki ───────────────────

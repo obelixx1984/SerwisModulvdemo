@@ -435,4 +435,23 @@ CREATE TABLE IF NOT EXISTS `photo_upload_tokens` (
     CONSTRAINT `fk_token_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
+-- ────────────────────────────────────────────────────────────
+-- Części zamienne użyte w przeglądach DUR
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `dur_spare_parts` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `review_id` INT UNSIGNED NOT NULL,
+    `category_id` INT UNSIGNED NOT NULL,
+    `part_name` VARCHAR(255) NOT NULL,
+    `quantity` INT UNSIGNED NOT NULL DEFAULT 1,
+    `added_by` INT UNSIGNED NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_dsp_review` (`review_id`),
+    KEY `idx_dsp_category` (`category_id`),
+    CONSTRAINT `fk_dsp_review` FOREIGN KEY (`review_id`) REFERENCES `maintenance_reviews` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dsp_category` FOREIGN KEY (`category_id`) REFERENCES `spare_part_categories` (`id`),
+    CONSTRAINT `fk_dsp_added_by` FOREIGN KEY (`added_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;

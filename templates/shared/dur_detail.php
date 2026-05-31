@@ -135,17 +135,35 @@ $canEditDur   = \App\Helpers\Auth::hasPermission('dur') && $isAuthor;
       endforeach; ?>
     </div>
   </div>
-  <?php if ($review['parts_used']): ?>
-    <div class="card">
-      <div class="card-head"><span class="card-title">Wymienione części i materiały</span></div>
-      <div class="card-body">
-        <?php foreach (explode("\n", $review['parts_used']) as $p): if (trim($p)): ?>
-            <div style="padding:4px 0;border-bottom:1px solid #f3f4f6;font-size:13px;">- <?= Helpers::e(trim($p)) ?></div>
-        <?php endif;
-        endforeach; ?>
-      </div>
+  <!-- ══ Karta: Części zamienne ═══════════════════════════════════ -->
+  <div class="card mb2">
+    <div class="card-head"><span class="card-title">🔧 Części zamienne</span></div>
+    <div class="card-body">
+      <?php if (!empty($durSpareParts)): ?>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #e5e7eb;">Część</th>
+              <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #e5e7eb;">Ilość</th>
+              <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #e5e7eb;">Kategoria</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($durSpareParts as $sp): ?>
+              <tr>
+                <td style="padding:4px 8px;"><?= Helpers::e($sp['part_name']) ?></td>
+                <td style="padding:4px 8px;"><?= (int)$sp['quantity'] ?></td>
+                <td style="padding:4px 8px;"><?= Helpers::catBadge($sp['category_name'], $sp['category_color']) ?></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      <?php else: ?>
+        <p class="muted fs-sm" style="margin:0;">Brak dodanych części zamiennych.</p>
+      <?php endif; ?>
     </div>
-  <?php endif; ?>
+  </div>
+  <!-- ══ Koniec karty: Części zamienne ══════════════════════════ -->
 </div>
 
 <?php require BASE_PATH . '/templates/shared/footer.php'; ?>

@@ -167,6 +167,104 @@ require BASE_PATH . '/templates/shared/header.php';
     </div>
 </div>
 
+<!-- ══ Karta: Części zamienne użyte w przeglądach DUR ══════════ -->
+<div class="card">
+    <div class="card mb2">
+        <div class="card-head">
+            <span class="card-title">Lista użytych części zamiennych w przeglądach DUR</span>
+        </div>
+
+        <!-- Filtry -->
+        <div style="padding:12px 16px;border-bottom:1px solid #e5e7eb;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+            <form method="GET" action="<?= BASE_URL ?>/index.php" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+                <input type="hidden" name="route" value="admin_spare_parts">
+                <div>
+                    <label class="flbl" style="font-size:.75rem;">Od</label>
+                    <input type="date" name="date_from" class="fc" value="<?= Helpers::e($_GET['date_from'] ?? '') ?>" style="width:140px;">
+                </div>
+                <div>
+                    <label class="flbl" style="font-size:.75rem;">Do</label>
+                    <input type="date" name="date_to" class="fc" value="<?= Helpers::e($_GET['date_to'] ?? '') ?>" style="width:140px;">
+                </div>
+                <div>
+                    <label class="flbl" style="font-size:.75rem;">Linia</label>
+                    <select name="line_id" class="fc" style="width:160px;">
+                        <option value="">Wszystkie linie</option>
+                        <?php foreach ($lines as $line): ?>
+                            <option value="<?= $line['id'] ?>" <?= (($_GET['line_id'] ?? '') == $line['id']) ? 'selected' : '' ?>>
+                                <?= Helpers::e($line['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="flbl" style="font-size:.75rem;">Kategoria</label>
+                    <select name="cat_id" class="fc" style="width:160px;">
+                        <option value="">Wszystkie kategorie</option>
+                        <?php foreach ($categories as $cat): ?>
+                            <option value="<?= $cat['id'] ?>" <?= (($_GET['cat_id'] ?? '') == $cat['id']) ? 'selected' : '' ?>>
+                                <?= Helpers::e($cat['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-p btn-sm">Filtruj</button>
+                    <a href="<?= BASE_URL ?>/index.php?route=admin_spare_parts" class="btn btn-sm">Resetuj</a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Tabela -->
+        <div class="twrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Przegląd</th>
+                        <th>Data</th>
+                        <th>Linia / urządzenie</th>
+                        <th>Część</th>
+                        <th>Kategoria</th>
+                        <th>Ilość</th>
+                        <th>Dodał</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($durSpareParts)): ?>
+                        <tr>
+                            <td colspan="6" class="muted fs-sm" style="text-align:center;padding:16px;">
+                                Brak części zamiennych w przeglądach DUR.
+                            </td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($durSpareParts as $dsp): ?>
+                            <tr>
+                                <td>
+                                    <a href="<?= BASE_URL ?>/index.php?route=dur_detail&id=<?= $dsp['review_id'] ?>" class="muted">
+                                        #<?= $dsp['review_id'] ?>
+                                    </a>
+                                </td>
+                                <td class="muted fs-sm"><?= Helpers::e($dsp['review_date']) ?></td>
+                                <td>
+                                    <?= Helpers::e($dsp['line_name']) ?>
+                                    <?php if ($dsp['subsystem_name']): ?>
+                                        <span class="muted fs-sm">/ <?= Helpers::e($dsp['subsystem_name']) ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= Helpers::e($dsp['part_name']) ?></td>
+                                <td><?= Helpers::catBadge($dsp['category_name'], $dsp['category_color']) ?></td>
+                                <td><?= (int)$dsp['quantity'] ?></td>
+                                <td class="muted fs-sm"><?= Helpers::e($dsp['added_by_name'] ?? '—') ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<!-- ══ Koniec karty: Części zamienne DUR ══════════════════════ -->
+
 <script>
     document.getElementById('spcKolor').addEventListener('input', function() {
         document.getElementById('spcKolorPrev').style.background = this.value;

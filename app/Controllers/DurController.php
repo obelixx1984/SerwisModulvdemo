@@ -156,7 +156,7 @@ class DurController
         }
         // ─────────────────...
         Helpers::flash('success', 'Raport DUR zapisany pomyślnie.');
-        Helpers::redirect('dur_detail', ['id' => $id]);
+        Helpers::redirect('dur_edit', ['id' => $id]);
     }
 
     public function scheduleNoteAdd(): void
@@ -299,6 +299,7 @@ class DurController
             require BASE_PATH . '/templates/shared/404.php';
             return;
         }
+        $durSpareParts = (new SparePartModel())->getByReview($id);
         require BASE_PATH . '/templates/shared/dur_detail.php';
     }
 
@@ -330,6 +331,8 @@ class DurController
             return;
         }
 
+        $durSpareParts       = (new SparePartModel())->getByReview($id);
+        $sparePartCategories = (new SparePartCategoryModel())->getAll();
         require BASE_PATH . '/templates/shared/dur_edit.php';
     }
 
@@ -405,6 +408,51 @@ class DurController
 
         Helpers::flash('success', 'Raport DUR zaktualizowany pomyślnie.');
         Helpers::redirect('dur_detail', ['id' => $id]);
+    }
+
+    public function sparePartAdd(): void
+    {
+        Auth::requireMechanic();
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('dur');
+        }
+        $reviewId   = (int)($_POST['review_id']   ?? 0);
+        $categoryId = (int)($_POST['category_id'] ?? 0);
+        $partName   = trim($_POST['part_name']    ?? '');
+        $quantity   = max(1, (int)($_POST['quantity'] ?? 1));
+
+        if (!$reviewId || !$categoryId || !$partName) {
+            Helpers::flash('error', 'Wypełnij wszystkie wymagane pola części zamiennej.');
+            Helpers::redirect('dur_edit&id=' . $reviewId);
+        }
+        $user = Auth::user();
+        (new SparePartModel())->createForReview([
+            'review_id'   => $reviewId,
+            'category_id' => $categoryId,
+            'part_name'   => $partName,
+            'quantity'    => $quantity,
+            'added_by'    => $user['id'],
+        ]);
+        Helpers::flash('success', 'Część dodana.');
+        Helpers::redirect('dur_edit&id=' . $reviewId);
+    }
+
+    public function sparePartDelete(): void
+    {
+        Auth::requireMechanic();
+        if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            Helpers::flash('error', 'Błąd bezpieczeństwa.');
+            Helpers::redirect('dur');
+        }
+        $spareId  = (int)($_POST['spare_id']  ?? 0);
+        $reviewId = (int)($_POST['review_id'] ?? 0);
+
+        if ($spareId > 0) {
+            (new SparePartModel())->deleteFromReview($spareId);
+            Helpers::flash('success', 'Część usunięta.');
+        }
+        Helpers::redirect('dur_detail&id=' . $reviewId);
     }
 }
 

@@ -131,10 +131,6 @@ foreach ($lines as $l) {
           placeholder="- Kontrola wizualna maszyny&#10;- Smarowanie prowadnic..."></textarea>
       </div>
       <div class="fg">
-        <label class="flbl">Wymienione części i materiały</label>
-        <textarea name="parts_used" class="fc" rows="2" placeholder="np. Smar litowy 200g"></textarea>
-      </div>
-      <div class="fg">
         <label class="flbl">Uwagi i zalecenia</label>
         <textarea name="notes" class="fc" rows="2" placeholder="np. Zalecana wymiana łożyska..."></textarea>
       </div>
@@ -171,6 +167,9 @@ foreach ($lines as $l) {
         <button type="submit" class="btn btn-v">Zapisz raport DUR</button>
         <a href="<?= BASE_URL ?>/index.php?route=dur" class="btn">Anuluj</a>
       </div>
+      <p class="muted fs-sm" style="margin-top:10px;">
+        💡 Części zamienne będziesz mógł dodać po zapisaniu raportu!!!
+      </p>
     </form>
   </div>
 </div>
