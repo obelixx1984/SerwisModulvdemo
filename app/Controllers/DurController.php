@@ -156,7 +156,12 @@ class DurController
         }
         // ─────────────────...
         Helpers::flash('success', 'Raport DUR zapisany pomyślnie.');
-        Helpers::redirect('dur_edit', ['id' => $id]);
+        $actionAfter = $_POST['action_after'] ?? 'list';
+        if ($actionAfter === 'parts') {
+            Helpers::redirect('dur_edit', ['id' => $id, 'parts' => '1']);
+        } else {
+            Helpers::redirect('dur');
+        }
     }
 
     public function scheduleNoteAdd(): void
@@ -424,7 +429,7 @@ class DurController
 
         if (!$reviewId || !$categoryId || !$partName) {
             Helpers::flash('error', 'Wypełnij wszystkie wymagane pola części zamiennej.');
-            Helpers::redirect('dur_edit&id=' . $reviewId);
+            Helpers::redirect('dur_edit', ['id' => $reviewId, 'parts' => '1']);
         }
         $user = Auth::user();
         (new SparePartModel())->createForReview([
@@ -435,7 +440,7 @@ class DurController
             'added_by'    => $user['id'],
         ]);
         Helpers::flash('success', 'Część dodana.');
-        Helpers::redirect('dur_edit&id=' . $reviewId);
+        Helpers::redirect('dur_edit', ['id' => $reviewId, 'parts' => '1']);
     }
 
     public function sparePartDelete(): void
@@ -452,7 +457,7 @@ class DurController
             (new SparePartModel())->deleteFromReview($spareId);
             Helpers::flash('success', 'Część usunięta.');
         }
-        Helpers::redirect('dur_detail&id=' . $reviewId);
+        Helpers::redirect('dur_edit', ['id' => $reviewId, 'parts' => '1']);
     }
 }
 

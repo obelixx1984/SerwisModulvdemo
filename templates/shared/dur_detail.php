@@ -136,8 +136,10 @@ $canEditDur   = \App\Helpers\Auth::hasPermission('dur') && $isAuthor;
     </div>
   </div>
   <!-- ══ Karta: Części zamienne ═══════════════════════════════════ -->
-  <div class="card mb2">
-    <div class="card-head"><span class="card-title">🔧 Części zamienne</span></div>
+  <div class="card mb2" style="border-left:3px solid #0369a1;">
+    <div class="card-head" style="background:#0a2463;border-bottom:1px solid #1e3a8a;">
+      <span class="card-title" style="color:#fff;">🔧 Części zamienne</span>
+    </div>
     <div class="card-body">
       <?php if (!empty($durSpareParts)): ?>
         <table style="width:100%;border-collapse:collapse;">
