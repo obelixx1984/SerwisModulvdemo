@@ -1,7 +1,7 @@
 <?php
 
 // ============================================================
-// index.php — Front Controller z autoloaderem PSR-4
+// index.php — Front Controller z autoloaderem PSR-4 i DI Container
 // ============================================================
 
 declare(strict_types=1);
@@ -10,32 +10,26 @@ declare(strict_types=1);
 define('BASE_PATH', __DIR__);
 
 // ── 1. Ładujemy klasę Autoloadera ────────────────────────────────────────────
-// To jedyny ręczny require w całym projekcie.
-// Autoloader.php musi być dostępny bez autoloadingu — dlatego ładujemy go wprost.
 require BASE_PATH . '/app/Core/Autoloader.php';
 
 // ── 2. Konfigurujemy autoloader PSR-4 ────────────────────────────────────────
 $loader = new \App\Core\Autoloader();
-
-// Mapowanie: przestrzeń 'App\' → katalog /app/
-// PSR-4 zamieni np. 'App\Controllers\AuthController'
-//   na: /app/Controllers/AuthController.php
 $loader->addPrefix('App\\', BASE_PATH . '/app');
-
-// Rejestrujemy autoloader w stosie PHP
 $loader->register();
 
 // ── 3. Konfiguracja aplikacji ─────────────────────────────────────────────────
-// Pliki konfiguracyjne nie są klasami — pozostają jako zwykłe require
 require BASE_PATH . '/config/database.php';
 require BASE_PATH . '/config/app.php';
 
-// ── 4. Start sesji i autentykacja ────────────────────────────────────────────
-// Auth::start() załaduje się automatycznie przez autoloader (App\Helpers\Auth)
+// ── 4. DI Container — budujemy kontener i rejestrujemy zależności ─────────────
+// Container jest dostępny jako $container — bindings.php go używa wprost
+$container = new \App\Core\Container();
+require BASE_PATH . '/config/bindings.php';
+
+// ── 5. Start sesji i autentykacja ─────────────────────────────────────────────
 \App\Helpers\Auth::start();
 
-// ── 5. Router ────────────────────────────────────────────────────────────────
-// Domyślna trasa: formularz logowania
+// ── 6. Router ─────────────────────────────────────────────────────────────────
 $route = $_GET['route'] ?? 'login';
 
 $routes = [
@@ -51,7 +45,7 @@ $routes = [
     'status_change'       => ['App\\Controllers\\FailureController', 'changeStatus'],
     'set_category'        => ['App\\Controllers\\FailureController', 'setCategory'],
     'add_comment'         => ['App\\Controllers\\FailureController', 'addComment'],
-    'add_observation_note' => ['App\\Controllers\\FailureController', 'addObservationNote'],
+    'add_observation_note'    => ['App\\Controllers\\FailureController', 'addObservationNote'],
     'delete_observation_note' => ['App\\Controllers\\FailureController', 'deleteObservationNote'],
     'failure_delete'      => ['App\\Controllers\\FailureController', 'deleteFailure'],
     'dur_note_add'        => ['App\\Controllers\\DurController',     'scheduleNoteAdd'],
@@ -80,9 +74,9 @@ $routes = [
     'admin_dict_save'     => ['App\\Controllers\\AdminController',   'dictItemSave'],
     'admin_symptoms'      => ['App\\Controllers\\AdminController',   'symptoms'],
     'admin_symptom_save'  => ['App\\Controllers\\AdminController',   'symptomSave'],
-    'admin_symptom_delete' => ['App\\Controllers\\AdminController',   'symptomDelete'],
+    'admin_symptom_delete' => ['App\\Controllers\\AdminController',  'symptomDelete'],
     'admin_dur_tmpl'      => ['App\\Controllers\\AdminController',   'durTemplates'],
-    'admin_dur_types_save' => ['App\\Controllers\\AdminController',   'durTypesSave'],
+    'admin_dur_types_save' => ['App\\Controllers\\AdminController',  'durTypesSave'],
     'admin_dur_tmpl_save' => ['App\\Controllers\\AdminController',   'tmplSave'],
     'admin_dur_statuses_save' => ['App\\Controllers\\AdminController', 'durStatusesSave'],
     'admin_dur_sched'     => ['App\\Controllers\\AdminController',   'durSchedules'],
@@ -101,11 +95,11 @@ $routes = [
     'photo_check_new'     => ['App\\Controllers\\FailureController', 'photoCheckNew'],
     'admin_spare_parts'   => ['App\\Controllers\\AdminController',   'spareParts'],
     'admin_spc_cat_save'  => ['App\\Controllers\\AdminController',   'sparePartCatSave'],
-    'admin_spc_cat_delete' => ['App\\Controllers\\AdminController',   'sparePartCatDelete'],
+    'admin_spc_cat_delete' => ['App\\Controllers\\AdminController',  'sparePartCatDelete'],
     'spare_part_add'      => ['App\\Controllers\\FailureController', 'sparePartAdd'],
     'spare_part_delete'   => ['App\\Controllers\\FailureController', 'sparePartDelete'],
-    'dur_spare_part_add'       => ['App\Controllers\DurController',   'sparePartAdd'],
-    'dur_spare_part_delete'    => ['App\Controllers\DurController',   'sparePartDelete'],
+    'dur_spare_part_add'       => ['App\\Controllers\\DurController', 'sparePartAdd'],
+    'dur_spare_part_delete'    => ['App\\Controllers\\DurController', 'sparePartDelete'],
     'ajax_note_add'       => ['App\\Controllers\\AjaxController',    'noteAdd'],
     'ajax_note_edit'      => ['App\\Controllers\\AjaxController',    'noteEdit'],
     'ajax_note_delete'    => ['App\\Controllers\\AjaxController',    'noteDelete'],
@@ -117,12 +111,18 @@ $routes = [
     'admin_sched_delete'  => ['App\\Controllers\\AdminController',   'deleteSched'],
 ];
 
-// ── 6. Dispatcher ─────────────────────────────────────────────────────────────
+// ── 7. Dispatcher — kontrolery z DI lub bez ──────────────────────────────────
+// Klasy zarejestrowane w kontenerze są tworzone przez DI (z zależnościami).
+// Pozostałe kontrolery (Admin, Auth, itp.) nie mają jeszcze DI — new $class().
 if (isset($routes[$route])) {
     [$class, $action] = $routes[$route];
 
-    // Klasa zostanie załadowana automatycznie przez autoloader PSR-4
-    (new $class())->$action();
+    // Pobierz z kontenera jeśli zarejestrowany, inaczej utwórz bezpośrednio
+    $controller = $container->has($class)
+        ? $container->get($class)
+        : new $class();
+
+    $controller->$action();
 } else {
     http_response_code(404);
     require BASE_PATH . '/templates/shared/404.php';
