@@ -21,6 +21,7 @@ use App\Models\{
     SettingsModel
 };
 use App\Services\FailureService;
+use App\DTOs\FailureFiltersDTO;
 
 /**
  * FailureController — obsługa żądań HTTP dla modułu zgłoszeń awarii.
@@ -101,21 +102,9 @@ class FailureController
         Auth::requireLogin();
         $this->guardPermission('failures', 'failures');
 
-        $filters   = $this->buildListFilters();
-        $result    = $this->svc->getPaginatedList($filters, max(1, (int)($_GET['page'] ?? 1)), RECORDS_PER_PAGE);
-        $this->renderList($result, $filters);
-    }
-
-    /** @return array<string, mixed> */
-    private function buildListFilters(): array
-    {
-        $catRaw = $_GET['category_id'] ?? '';
-        return array_filter([
-            'status_id'   => (int)($_GET['status_id'] ?? 0) ?: null,
-            'line_id'     => (int)($_GET['line_id']   ?? 0) ?: null,
-            'category_id' => $catRaw === 'none' ? 'none' : ((int)$catRaw ?: null),
-            'search'      => trim($_GET['search'] ?? '') ?: null,
-        ]);
+        $dto    = FailureFiltersDTO::fromGet($_GET);
+        $result = $this->svc->getPaginatedList($dto->toArray(), $dto->page, RECORDS_PER_PAGE);
+        $this->renderList($result, $dto->toArray());
     }
 
     /** @param array<string, mixed> $result */
