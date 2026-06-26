@@ -92,6 +92,77 @@
     </div>
   <?php endif; ?>
 
+  <!-- ══ Modal: Historia zmian (CHANGELOG) ═══════════════════ -->
+  <?php
+    $changelogPath    = BASE_PATH . '/CHANGELOG.md';
+    $changelogContent = is_file($changelogPath)
+      ? file_get_contents($changelogPath)
+      : 'Plik CHANGELOG.md nie został znaleziony.';
+  ?>
+  <style>
+    .changelog-body h1, .changelog-body h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 22px 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e5e7eb;
+      color: #1f2328;
+    }
+    .changelog-body h1:first-child, .changelog-body h2:first-child { margin-top: 0; }
+    .changelog-body h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 18px 0 8px;
+      color: #1f2328;
+    }
+    .changelog-body p {
+      font-size: 13.5px;
+      line-height: 1.6;
+      margin: 0 0 10px;
+      color: #374151;
+    }
+    .changelog-body ul {
+      margin: 0 0 14px;
+      padding-left: 22px;
+    }
+    .changelog-body li {
+      font-size: 13.5px;
+      line-height: 1.65;
+      margin-bottom: 5px;
+      color: #374151;
+    }
+    .changelog-body code {
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: Consolas, 'Liberation Mono', Menlo, monospace;
+      font-size: 12px;
+      color: #b3261e;
+    }
+    .changelog-body hr {
+      border: none;
+      border-top: 1px solid #e5e7eb;
+      margin: 22px 0;
+    }
+    .changelog-body a {
+      color: #0969da;
+      text-decoration: none;
+    }
+    .changelog-body a:hover { text-decoration: underline; }
+  </style>
+  <div class="modal-overlay" id="changelogModal" onclick="closeChangelogModalOutside(event)">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="changelogModalTitle" style="max-width:720px;">
+      <div class="modal-head">
+        <span id="changelogModalTitle">📋 Historia zmian</span>
+        <button class="modal-close" onclick="closeChangelogModal()" type="button" aria-label="Zamknij">×</button>
+      </div>
+      <div class="modal-body changelog-body" style="max-height:70vh;overflow-y:auto;">
+        <?= \App\Helpers\Helpers::markdownToHtml($changelogContent) ?>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ── Dropdown użytkownika ──────────────────────────────────
     function toggleUserMenu(e) {
@@ -166,6 +237,23 @@
 
     function closePassModalOutside(e) {
       if (e.target === document.getElementById('passModal')) closePassModal();
+    }
+
+    // ── Modal historii zmian (CHANGELOG) ───────────────────────
+    function openChangelogModal() {
+      var m = document.getElementById('changelogModal');
+      if (!m) return;
+      m.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeChangelogModal() {
+      var m = document.getElementById('changelogModal');
+      if (!m) return;
+      m.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+    function closeChangelogModalOutside(e) {
+      if (e.target === document.getElementById('changelogModal')) closeChangelogModal();
     }
 
     // Walidacja zgodności haseł

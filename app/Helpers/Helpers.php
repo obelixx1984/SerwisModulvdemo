@@ -161,4 +161,69 @@ class Helpers
             default     => ucfirst($type),
         };
     }
+
+    /**
+     * Bardzo prosty konwerter Markdown → HTML (bez bibliotek/Composera).
+     * Obsługuje: nagłówki (#, ##, ###), listy (- ), pogrubienie (**tekst**),
+     * kod inline (`kod`), linki [tekst](url) oraz linie poziome (---).
+     * Wystarczający do renderowania CHANGELOG.md w stylu zbliżonym do GitHuba.
+     */
+    public static function markdownToHtml(string $md): string
+    {
+        $lines  = explode("\n", str_replace("\r\n", "\n", $md));
+        $html   = '';
+        $inList = false;
+
+        foreach ($lines as $line) {
+            $trim = trim($line);
+
+            // Linia pozioma: ---, ------, ***
+            if (preg_match('/^-{3,}$/', $trim) || preg_match('/^\*{3,}$/', $trim)) {
+                if ($inList) { $html .= "</ul>\n"; $inList = false; }
+                $html .= "<hr>\n";
+                continue;
+            }
+
+            // Nagłówki: #, ##, ### ...
+            if (preg_match('/^(#{1,6})\s+(.*)$/', $trim, $m)) {
+                if ($inList) { $html .= "</ul>\n"; $inList = false; }
+                $level = strlen($m[1]);
+                $html .= "<h{$level} class=\"md-h{$level}\">" . self::mdInline($m[2]) . "</h{$level}>\n";
+                continue;
+            }
+
+            // Element listy: "- " lub "* "
+            if (preg_match('/^[-*]\s+(.*)$/', $trim, $m)) {
+                if (!$inList) { $html .= "<ul>\n"; $inList = true; }
+                $html .= '<li>' . self::mdInline($m[1]) . "</li>\n";
+                continue;
+            }
+
+            // Pusta linia — zamyka listę / robi odstęp
+            if ($trim === '') {
+                if ($inList) { $html .= "</ul>\n"; $inList = false; }
+                continue;
+            }
+
+            // Zwykły akapit
+            if ($inList) { $html .= "</ul>\n"; $inList = false; }
+            $html .= '<p>' . self::mdInline($trim) . "</p>\n";
+        }
+
+        if ($inList) {
+            $html .= "</ul>\n";
+        }
+
+        return $html;
+    }
+
+    /** Formatowanie inline dla markdownToHtml(): pogrubienie, kod, linki */
+    private static function mdInline(string $text): string
+    {
+        $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+        $text = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $text);
+        $text = preg_replace('/`([^`]+)`/', '<code>$1</code>', $text);
+        $text = preg_replace('/\[([^\]]+)\]\(([^)]+)\)/', '<a href="$2" target="_blank" rel="noopener">$1</a>', $text);
+        return $text;
+    }
 }
