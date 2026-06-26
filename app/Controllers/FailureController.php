@@ -156,6 +156,7 @@ class FailureController
         $isLeader            = $this->assignments->isLeader($failure['id'], (int)$user['id']);
         $hasLeader           = !empty(array_filter($assignments, fn($a) => !empty($a['is_first'])));
         $symptoms            = $this->symptoms->getActive();
+        $observationWindowHours = (int)($this->settings->get('observation_window_hours') ?? 8);
 
         require BASE_PATH . '/templates/shared/failure_detail.php';
     }
@@ -177,7 +178,8 @@ class FailureController
                 (int)($_POST['status_id'] ?? 0),
                 (int)$user['id'],
                 $user['name'],
-                trim($_POST['note'] ?? '')
+                trim($_POST['note'] ?? ''),
+                trim($_POST['observation_until'] ?? '') ?: null
             );
             Helpers::flash('success', 'Status zmieniony.');
         } catch (\InvalidArgumentException $e) {
@@ -256,6 +258,55 @@ class FailureController
         $this->svc->addComment($id, $user['id'], $user['name'], $comment);
         Helpers::flash('success', 'Komentarz dodany.');
         Helpers::redirect('failure_detail', ['id' => $id]);
+    }
+
+    public function editComment(): void
+    {
+        Auth::requireMechanic();
+        $this->verifyCsrf();
+        $commentId = (int)($_POST['comment_id'] ?? 0);
+        $failureId = (int)($_POST['failure_id'] ?? 0);
+        $comment   = trim($_POST['comment'] ?? '');
+
+        $existing = $this->svc->getCommentById($commentId);
+        if (!$existing || (int)$existing['failure_id'] !== $failureId) {
+            Helpers::flash('error', 'Nie znaleziono komentarza.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+        }
+        $user = Auth::user();
+        if ((int)$existing['user_id'] !== (int)$user['id']) {
+            Helpers::flash('error', 'Możesz edytować tylko własne komentarze.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+        }
+        if (!$comment) {
+            Helpers::flash('error', 'Komentarz nie może być pusty.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+        }
+        $this->svc->updateComment($commentId, $comment);
+        Helpers::flash('success', 'Komentarz zaktualizowany.');
+        Helpers::redirect('failure_detail', ['id' => $failureId]);
+    }
+
+    public function deleteComment(): void
+    {
+        Auth::requireMechanic();
+        $this->verifyCsrf();
+        $commentId = (int)($_POST['comment_id'] ?? 0);
+        $failureId = (int)($_POST['failure_id'] ?? 0);
+
+        $existing = $this->svc->getCommentById($commentId);
+        if (!$existing || (int)$existing['failure_id'] !== $failureId) {
+            Helpers::flash('error', 'Nie znaleziono komentarza.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+        }
+        $user = Auth::user();
+        if ((int)$existing['user_id'] !== (int)$user['id']) {
+            Helpers::flash('error', 'Możesz usuwać tylko własne komentarze.');
+            Helpers::redirect('failure_detail', ['id' => $failureId]);
+        }
+        $this->svc->deleteComment($commentId);
+        Helpers::flash('success', 'Komentarz usunięty.');
+        Helpers::redirect('failure_detail', ['id' => $failureId]);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

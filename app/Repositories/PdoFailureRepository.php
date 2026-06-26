@@ -173,20 +173,33 @@ class PdoFailureRepository
      * @param bool $isObserved  Czy status uruchamia okno obserwacji
      */
     public function changeStatus(
-        int  $id,
-        int  $newStatusId,
-        bool $isFinal,
-        bool $isObserved = false
+        int     $id,
+        int     $newStatusId,
+        bool    $isFinal,
+        bool    $isObserved = false,
+        ?string $observationUntil = null
     ): void {
-        // Dynamiczne fragmenty SQL w zależności od typu statusu
-        $closedPart      = $isFinal    ? 'closed_at = NOW(),' : '';
-        $observationPart = $isObserved ? 'observation_started_at = NOW(),' : 'observation_started_at = NULL,';
+        $closedPart = $isFinal ? 'closed_at = NOW(),' : '';
+        $params     = [$newStatusId];
+
+        if ($isObserved) {
+            if ($observationUntil !== null) {
+                $observationPart = 'observation_started_at = NOW(), observation_until = ?,';
+                $params[]        = $observationUntil;
+            } else {
+                $observationPart = 'observation_started_at = NOW(), observation_until = NULL,';
+            }
+        } else {
+            $observationPart = 'observation_started_at = NULL, observation_until = NULL,';
+        }
+
+        $params[] = $id;
 
         $st = $this->db->prepare(
             "UPDATE failures SET status_id = ?, {$closedPart} {$observationPart} updated_at = NOW()
-             WHERE id = ?"
+         WHERE id = ?"
         );
-        $st->execute([$newStatusId, $id]);
+        $st->execute($params);
     }
 
     /**
@@ -404,6 +417,26 @@ class PdoFailureRepository
         );
         $st->execute([$failureId, $userId, $author, $comment]);
         return (int)$this->db->lastInsertId();
+    }
+
+    public function getCommentById(int $id): ?array
+    {
+        $st = $this->db->prepare("SELECT * FROM failure_comments WHERE id = ?");
+        $st->execute([$id]);
+        $row = $st->fetch();
+        return $row ?: null;
+    }
+
+    public function updateComment(int $id, string $comment): void
+    {
+        $st = $this->db->prepare("UPDATE failure_comments SET comment = ? WHERE id = ?");
+        $st->execute([$comment, $id]);
+    }
+
+    public function deleteComment(int $id): void
+    {
+        $st = $this->db->prepare("DELETE FROM failure_comments WHERE id = ?");
+        $st->execute([$id]);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

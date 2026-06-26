@@ -55,8 +55,9 @@ require BASE_PATH . '/templates/shared/header.php';
       </div>
       <div class="fg" style="margin:0;flex:2;min-width:140px;">
         <label class="flbl">Szukaj</label>
-        <input type="text" name="search" class="fc" placeholder="Numer, opis lub objaw..."
-               value="<?= Helpers::e($_GET['search'] ?? '') ?>">
+        <input type="text" name="search" id="searchInput" class="fc" list="searchSuggestions" autocomplete="off"
+               placeholder="Wpisz min. 2 znaki — np. numer zgłoszenia, fragment opisu lub nazwę objawu" value="<?= Helpers::e($_GET['search'] ?? '') ?>">
+        <datalist id="searchSuggestions"></datalist>
       </div>
       <button type="submit" class="btn btn-p btn-sm" style="margin-bottom:0;">Szukaj</button>
       <a href="<?= BASE_URL ?>/index.php?route=failures" class="btn btn-sm" style="margin-bottom:0;">Reset</a>
@@ -149,5 +150,32 @@ require BASE_PATH . '/templates/shared/header.php';
   </div>
   <?php endif; ?>
 </div>
+
+<script>
+(function () {
+  var input = document.getElementById('searchInput');
+  var list  = document.getElementById('searchSuggestions');
+  if (!input) return;
+  var timer = null;
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    var term = input.value.trim();
+    if (term.length < 2) { list.innerHTML = ''; return; }
+    timer = setTimeout(function () {
+      fetch('<?= BASE_URL ?>/index.php?route=ajax_search_suggest&term=' + encodeURIComponent(term), { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          list.innerHTML = '';
+          (data.suggestions || []).forEach(function (s) {
+            var opt = document.createElement('option');
+            opt.value = s;
+            list.appendChild(opt);
+          });
+        })
+        .catch(function () {});
+    }, 250);
+  });
+})();
+</script>
 
 <?php require BASE_PATH . '/templates/shared/footer.php'; ?>

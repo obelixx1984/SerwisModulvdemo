@@ -1,7 +1,10 @@
 <?php
 // ============================================================
 // templates/shared/my_repairs.php — Moje naprawy
-// NOWY PLIK — skopiuj do templates/shared/
+// ZMIANA: pasek filtrów (status/linia/rodzaj/rola w obsadzie) renderowany
+//         ZAWSZE — także gdy wynik filtrowania jest pusty — dzięki czemu
+//         przycisk "Reset" jest zawsze dostępny i nie trzeba czyścić
+//         parametrów GET ręcznie w adresie URL.
 // ============================================================
 use App\Helpers\Helpers;
 
@@ -18,24 +21,88 @@ require BASE_PATH . '/templates/shared/header.php';
   </div>
 </div>
 
+<?php
+// ZMIANA: flaga informująca, czy jakikolwiek filtr jest aktywny —
+// używana do rozróżnienia komunikatu "brak napraw" / "brak wyników dla filtrów"
+$hasActiveFilter = !empty($_GET['status_id']) || !empty($_GET['line_id'])
+  || !empty($_GET['category_id']) || !empty($_GET['role']);
+?>
+
+<!-- Filtry — renderowane ZAWSZE, niezależnie od liczby wyników -->
+<div class="card mb2">
+  <div class="card-body" style="padding:10px 14px;">
+    <form method="GET" action="<?= BASE_URL ?>/index.php" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+      <input type="hidden" name="route" value="my_repairs">
+      <div class="fg" style="margin:0;flex:1;min-width:120px;">
+        <label class="flbl">Status</label>
+        <select name="status_id" class="fc">
+          <option value="">— Wszystkie —</option>
+          <?php foreach ($statuses as $s): ?>
+            <option value="<?= $s['id'] ?>" <?= ($_GET['status_id'] ?? '') == $s['id'] ? 'selected' : '' ?>>
+              <?= Helpers::e($s['label']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="fg" style="margin:0;flex:1;min-width:120px;">
+        <label class="flbl">Linia</label>
+        <select name="line_id" class="fc">
+          <option value="">— Wszystkie —</option>
+          <?php foreach ($lines as $l): ?>
+            <option value="<?= $l['id'] ?>" <?= ($_GET['line_id'] ?? '') == $l['id'] ? 'selected' : '' ?>>
+              <?= Helpers::e($l['name']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="fg" style="margin:0;flex:1;min-width:120px;">
+        <label class="flbl">Rodzaj</label>
+        <select name="category_id" class="fc">
+          <option value="">— Wszystkie —</option>
+          <option value="none" <?= ($_GET['category_id'] ?? '') === 'none' ? 'selected' : '' ?>>— Bez kategorii —</option>
+          <?php foreach ($categories as $cat): ?>
+            <option value="<?= $cat['id'] ?>" <?= ($_GET['category_id'] ?? '') == $cat['id'] ? 'selected' : '' ?>>
+              <?= Helpers::e($cat['label']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="fg" style="margin:0;flex:1;min-width:140px;">
+        <label class="flbl">Rola w obsadzie</label>
+        <select name="role" class="fc">
+          <option value="">— Wszystkie —</option>
+          <option value="leader" <?= ($_GET['role'] ?? '') === 'leader' ? 'selected' : '' ?>>Prowadzący</option>
+          <option value="crew" <?= ($_GET['role'] ?? '') === 'crew' ? 'selected' : '' ?>>Obsada</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-p btn-sm" style="margin-bottom:0;">Filtruj</button>
+      <a href="<?= BASE_URL ?>/index.php?route=my_repairs" class="btn btn-sm" style="margin-bottom:0;">Reset</a>
+    </form>
+  </div>
+</div>
+
 <?php if (empty($myRepairs)): ?>
   <div class="card">
     <div class="card-body" style="text-align:center;padding:32px 16px;">
       <div style="font-size:32px;margin-bottom:8px;">🔩</div>
       <div class="fw6" style="margin-bottom:4px;">Brak napraw</div>
-      <div class="muted fs-sm">Nie figurujesz jeszcze w obsadzie żadnego zgłoszenia.</div>
+      <div class="muted fs-sm">
+        <?= $hasActiveFilter
+          ? 'Brak napraw spełniających wybrane filtry.'
+          : 'Nie figurujesz jeszcze w obsadzie żadnego zgłoszenia.' ?>
+      </div>
     </div>
   </div>
 <?php else: ?>
 
   <!-- Podsumowanie statusów -->
   <?php
-    $openCount   = 0;
-    $closedCount = 0;
-    foreach ($myRepairs as $r) {
-      if (!empty($r['status_is_final'])) $closedCount++;
-      else $openCount++;
-    }
+  $openCount   = 0;
+  $closedCount = 0;
+  foreach ($myRepairs as $r) {
+    if (!empty($r['status_is_final'])) $closedCount++;
+    else $openCount++;
+  }
   ?>
   <div class="stats mb2" style="grid-template-columns:repeat(3,1fr);">
     <div class="stat-card">
@@ -69,51 +136,51 @@ require BASE_PATH . '/templates/shared/header.php';
         </thead>
         <tbody>
           <?php foreach ($myRepairs as $r): ?>
-          <tr<?= !empty($r['status_is_final']) ? ' style="opacity:.75;"' : '' ?>>
-            <td>
-              <a href="<?= BASE_URL ?>/index.php?route=failure_detail&id=<?= $r['id'] ?>"
-                 class="mono fw6 fs-sm" style="color:#0a2463;">
-                <?= Helpers::e($r['ticket_number']) ?>
-              </a>
-            </td>
-            <td class="fs-sm">
-              <?= Helpers::e($r['line_name']) ?>
-              <?php if ($r['subsystem_name']): ?>
-                <div class="muted" style="font-size:11px;"><?= Helpers::e($r['subsystem_name']) ?></div>
-              <?php endif; ?>
-            </td>
-            <td class="fs-sm">
-              <?= $r['symptom_name'] ? Helpers::e($r['symptom_name']) : '<span class="muted">—</span>' ?>
-            </td>
-            <td>
-              <?= $r['category_id']
-                ? Helpers::catBadge($r['cat_label'], $r['cat_color'])
-                : '<span class="muted fs-sm">—</span>' ?>
-            </td>
-            <td>
-              <?= Helpers::statusBadge($r['status_label'], $r['status_color']) ?>
-            </td>
-            <td>
-              <?php if (!empty($r['is_first'])): ?>
-                <span class="badge" style="background:#e8eeff;color:#0a2463;border:1px solid #c7d2fe;">
-                  👷 Prowadzący
-                </span>
-              <?php else: ?>
-                <span class="badge" style="background:#f3f4f6;color:#6b7280;">
-                  Obsada
-                </span>
-              <?php endif; ?>
-            </td>
-            <td class="muted fs-sm">
-              <?= Helpers::formatDateOnly($r['created_at']) ?>
-            </td>
-            <td>
-              <a href="<?= BASE_URL ?>/index.php?route=failure_detail&id=<?= $r['id'] ?>"
-                 class="btn btn-sm btn-p" style="font-size:11px;padding:3px 9px;">
-                Otwórz
-              </a>
-            </td>
-          </tr>
+            <tr<?= !empty($r['status_is_final']) ? ' style="opacity:.75;"' : '' ?>>
+              <td>
+                <a href="<?= BASE_URL ?>/index.php?route=failure_detail&id=<?= $r['id'] ?>"
+                  class="mono fw6 fs-sm" style="color:#0a2463;">
+                  <?= Helpers::e($r['ticket_number']) ?>
+                </a>
+              </td>
+              <td class="fs-sm">
+                <?= Helpers::e($r['line_name']) ?>
+                <?php if ($r['subsystem_name']): ?>
+                  <div class="muted" style="font-size:11px;"><?= Helpers::e($r['subsystem_name']) ?></div>
+                <?php endif; ?>
+              </td>
+              <td class="fs-sm">
+                <?= $r['symptom_name'] ? Helpers::e($r['symptom_name']) : '<span class="muted">—</span>' ?>
+              </td>
+              <td>
+                <?= $r['category_id']
+                  ? Helpers::catBadge($r['cat_label'], $r['cat_color'])
+                  : '<span class="muted fs-sm">—</span>' ?>
+              </td>
+              <td>
+                <?= Helpers::statusBadge($r['status_label'], $r['status_color']) ?>
+              </td>
+              <td>
+                <?php if (!empty($r['is_first'])): ?>
+                  <span class="badge" style="background:#e8eeff;color:#0a2463;border:1px solid #c7d2fe;">
+                    👷 Prowadzący
+                  </span>
+                <?php else: ?>
+                  <span class="badge" style="background:#f3f4f6;color:#6b7280;">
+                    Obsada
+                  </span>
+                <?php endif; ?>
+              </td>
+              <td class="muted fs-sm">
+                <?= Helpers::formatDateOnly($r['created_at']) ?>
+              </td>
+              <td>
+                <a href="<?= BASE_URL ?>/index.php?route=failure_detail&id=<?= $r['id'] ?>"
+                  class="btn btn-sm btn-p" style="font-size:11px;padding:3px 9px;">
+                  Otwórz
+                </a>
+              </td>
+            </tr>
           <?php endforeach; ?>
         </tbody>
       </table>

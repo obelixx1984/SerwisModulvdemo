@@ -193,17 +193,28 @@ class UserController
     {
         Auth::requireLogin();
 
-        // Tylko dla użytkowników z uprawnieniem 'statuses'
         if (!Auth::isMechanic() && !Auth::hasPermission('statuses')) {
             Helpers::flash('error', 'Brak uprawnień do tej sekcji.');
             Helpers::redirect('dashboard');
             return;
         }
 
-        $user      = Auth::user();
-        $am        = new AssignmentModel();
-        $myRepairs = $am->getByUserId((int)$user['id']);
-        $pageTitle = 'Moje naprawy';
+        $user = Auth::user();
+        $am   = new AssignmentModel();
+
+        $catRaw  = trim($_GET['category_id'] ?? '');
+        $filters = array_filter([
+            'status_id'   => (int)($_GET['status_id'] ?? 0) > 0 ? (int)$_GET['status_id'] : null,
+            'line_id'     => (int)($_GET['line_id'] ?? 0) > 0 ? (int)$_GET['line_id'] : null,
+            'category_id' => $catRaw === 'none' ? 'none' : ((int)$catRaw > 0 ? (int)$catRaw : null),
+            'role'        => in_array($_GET['role'] ?? '', ['leader', 'crew'], true) ? $_GET['role'] : null,
+        ], fn($v) => $v !== null);
+
+        $myRepairs  = $am->getByUserId((int)$user['id'], $filters);
+        $statuses   = (new StatusModel())->getAll(true);
+        $lines      = (new ProductionLineModel())->getAll(true);
+        $categories = (new CategoryModel())->getAll(true);
+        $pageTitle  = 'Moje naprawy';
 
         require BASE_PATH . '/templates/shared/my_repairs.php';
     }

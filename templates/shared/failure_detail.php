@@ -163,9 +163,10 @@ $hasAnyObservationNotes = $hasAnyObservationNotes ?? false;
 
     <?php if (!empty($failure['status_is_observed'])): ?>
       <?php
-      // Oblicz datę wygaśnięcia do wyświetlenia
       $obsExpires = '';
-      if (!empty($failure['observation_started_at'])) {
+      if (!empty($failure['observation_until'])) {
+        $obsExpires = date('d.m.Y H:i', strtotime($failure['observation_until']));
+      } elseif (!empty($failure['observation_started_at'])) {
         $obsExpires = date('d.m.Y H:i', strtotime($failure['observation_started_at']) + ($observationWindowHours ?? 8) * 3600);
       }
       ?>
@@ -332,12 +333,40 @@ $hasAnyObservationNotes = $hasAnyObservationNotes ?? false;
       <div class="card-body">
         <?php if ($comments): ?>
           <?php foreach ($comments as $c): ?>
+            <?php $isOwnComment = (int)($c['user_id'] ?? 0) === (int)$user['id']; ?>
             <div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">
               <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
                 <strong class="fs-sm"><?= Helpers::e($c['author']) ?></strong>
                 <span class="muted fs-sm"><?= Helpers::formatDate($c['created_at']) ?></span>
               </div>
-              <p style="font-size:13px;line-height:1.5;"><?= nl2br(Helpers::e($c['comment'])) ?></p>
+              <p class="comment-view-<?= $c['id'] ?>" style="font-size:13px;line-height:1.5;"><?= nl2br(Helpers::e($c['comment'])) ?></p>
+
+              <?php if ($isOwnComment): ?>
+                <div style="display:flex;gap:6px;margin-top:4px;">
+                  <button type="button" class="btn btn-sm" style="font-size:11px;padding:2px 8px;"
+                    onclick="toggleCommentEdit(<?= $c['id'] ?>)">✎ Edytuj</button>
+                  <form method="POST" action="<?= BASE_URL ?>/index.php?route=comment_delete" style="margin:0;"
+                    onsubmit="return confirm('Usunąć ten komentarz?')">
+                    <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
+                    <input type="hidden" name="comment_id" value="<?= $c['id'] ?>">
+                    <input type="hidden" name="failure_id" value="<?= $failure['id'] ?>">
+                    <button type="submit" class="btn btn-sm" style="font-size:11px;padding:2px 8px;color:#dc2626;border-color:#fca5a5;">✕ Usuń</button>
+                  </form>
+                </div>
+
+                <form method="POST" action="<?= BASE_URL ?>/index.php?route=comment_edit"
+                  id="comment-edit-form-<?= $c['id'] ?>" style="display:none;margin-top:6px;">
+                  <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
+                  <input type="hidden" name="comment_id" value="<?= $c['id'] ?>">
+                  <input type="hidden" name="failure_id" value="<?= $failure['id'] ?>">
+                  <textarea name="comment" class="fc" rows="2" required><?= Helpers::e($c['comment']) ?></textarea>
+                  <div style="margin-top:4px;display:flex;gap:6px;">
+                    <button type="submit" class="btn btn-p btn-sm" style="font-size:11px;padding:2px 8px;">Zapisz</button>
+                    <button type="button" class="btn btn-sm" style="font-size:11px;padding:2px 8px;"
+                      onclick="toggleCommentEdit(<?= $c['id'] ?>)">Anuluj</button>
+                  </div>
+                </form>
+              <?php endif; ?>
             </div>
           <?php endforeach; ?>
         <?php else: ?>
@@ -751,7 +780,7 @@ $hasAnyObservationNotes = $hasAnyObservationNotes ?? false;
               nie można dalej zmieniać statusu tego zgłoszenia.
             </div>
           <?php else: ?>
-            <form method="POST" action="<?= BASE_URL ?>/index.php?route=status_change">
+            <form method="POST" action="<?= BASE_URL ?>/index.php?route=status_change" id="statusChangeForm" data-default-hours="<?= $observationWindowHours ?>">
               <input type="hidden" name="csrf_token" value="<?= \App\Helpers\Auth::csrfToken() ?>">
               <input type="hidden" name="failure_id" value="<?= $failure['id'] ?>">
               <div class="fg">
@@ -763,7 +792,7 @@ $hasAnyObservationNotes = $hasAnyObservationNotes ?? false;
                     if (!empty($s['is_initial'])) continue;
                     if ($s['id'] == $failure['status_id']) continue;
                     ?>
-                    <option value="<?= $s['id'] ?>" data-final="<?= $s['is_final'] ?>">
+                    <option value="<?= $s['id'] ?>" data-final="<?= $s['is_final'] ?>" data-observed="<?= $s['is_observed'] ?>">
                       <?= Helpers::e($s['label']) ?>
                     </option>
                   <?php endforeach; ?>
@@ -773,6 +802,7 @@ $hasAnyObservationNotes = $hasAnyObservationNotes ?? false;
                 <label class="flbl">Notatka (opcjonalnie)</label>
                 <textarea name="note" class="fc" rows="2" placeholder="Krótki opis powodu zmiany..."></textarea>
               </div>
+              <input type="hidden" name="observation_until" id="observationUntilInput" value="">
               <button type="submit" class="btn btn-p btn-sm">Zmień status</button>
             </form>
           <?php endif; ?>
@@ -1095,6 +1125,16 @@ $hasAnyObservationNotes = $hasAnyObservationNotes ?? false;
       if (note) note.required = false;
     }
   }
+
+  function toggleCommentEdit(id) {
+    var view = document.querySelector('.comment-view-' + id);
+    var form = document.getElementById('comment-edit-form-' + id);
+    var hidden = !form.style.display || form.style.display === 'none';
+    form.style.display = hidden ? 'block' : 'none';
+    view.style.display = hidden ? 'none' : '';
+  }
+
+
 
   function openEditModal(failureId, ticket, lineName, subsystemName, currentSymptomId, isOtherSymptom, currentDesc) {
     var idEl = document.getElementById('editFailureId');
@@ -1553,6 +1593,82 @@ $hasAnyObservationNotes = $hasAnyObservationNotes ?? false;
     label.textContent = isOpen ?
       'Pokaż uwagi (<?= count($observationNotes) ?>)' :
       'Ukryj uwagi (<?= count($observationNotes) ?>)';
+  }
+</script>
+
+<div class="edit-modal-overlay" id="observationModal" onclick="closeObservationModalOutside(event)">
+  <div class="edit-modal-box" role="dialog" aria-modal="true">
+    <div class="edit-modal-head">
+      <span>Czas okna obserwacji</span>
+      <button class="edit-modal-close" type="button" onclick="closeObservationModal()">×</button>
+    </div>
+    <div class="edit-modal-body">
+      <p class="fs-sm" style="margin-bottom:12px;">
+        Wybrany status uruchamia okno obserwacji. Użyć domyślnego czasu
+        (<strong id="obsDefaultHoursLabel">8</strong> godz.) czy ustawić własny termin?
+      </p>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <button type="button" class="btn btn-p btn-sm" onclick="chooseDefaultObservation()">Domyślny czas</button>
+        <button type="button" class="btn btn-sm" onclick="showCustomObservationPicker()">Wybierz własny czas</button>
+      </div>
+      <div id="obsCustomPickerRow" style="display:none;">
+        <div style="display:flex;gap:8px;">
+          <div class="fg" style="flex:1;">
+            <label class="flbl">Data</label>
+            <input type="date" id="obsCustomDateInput" class="fc">
+          </div>
+          <div class="fg" style="flex:1;">
+            <label class="flbl">Godzina</label>
+            <input type="time" id="obsCustomTimeInput" class="fc" value="08:00">
+          </div>
+        </div>
+        <button type="button" class="btn btn-p btn-sm" onclick="confirmCustomObservation()">Zatwierdź</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.getElementById('statusChangeForm')?.addEventListener('submit', function(e) {
+    var sel = document.getElementById('statusSelect');
+    var opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.observed === '1' && !window.__obsConfirmed) {
+      e.preventDefault();
+      window.__pendingStatusForm = this;
+      document.getElementById('obsDefaultHoursLabel').textContent = this.dataset.defaultHours || 8;
+      document.getElementById('observationModal').classList.add('open');
+    }
+  });
+
+  function closeObservationModal() {
+    document.getElementById('observationModal').classList.remove('open');
+  }
+
+  function closeObservationModalOutside(e) {
+    if (e.target.id === 'observationModal') closeObservationModal();
+  }
+
+  function chooseDefaultObservation() {
+    document.getElementById('observationUntilInput').value = '';
+    window.__obsConfirmed = true;
+    closeObservationModal();
+    window.__pendingStatusForm.submit();
+  }
+
+  function showCustomObservationPicker() {
+    document.getElementById('obsCustomPickerRow').style.display = 'block';
+  }
+
+  function confirmCustomObservation() {
+    var dateVal = document.getElementById('obsCustomDateInput').value;
+    var timeVal = document.getElementById('obsCustomTimeInput').value;
+    if (!dateVal || !timeVal) {
+      alert('Wybierz datę i godzinę.');
+      return;
+    }
+    document.getElementById('observationUntilInput').value = dateVal + ' ' + timeVal + ':00';
+    window.__obsConfirmed = true;
+    closeObservationModal();
+    window.__pendingStatusForm.submit();
   }
 </script>
 

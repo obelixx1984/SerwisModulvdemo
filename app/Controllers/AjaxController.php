@@ -136,4 +136,32 @@ class AjaxController
         $notes = (new \App\Models\ScheduleNoteModel())->getActiveBySchedule($scheduleId);
         $this->jsonOut(['ok' => true, 'notes' => $notes]);
     }
+
+    public function searchSuggest(): void
+    {
+        Auth::requireLogin();
+        $term = trim($_GET['term'] ?? '');
+        if (mb_strlen($term) < 2) {
+            $this->jsonOut(['ok' => true, 'suggestions' => []]);
+        }
+        $db   = \App\Helpers\Database::get();
+        $like = '%' . $term . '%';
+
+        $st = $db->prepare("SELECT DISTINCT ticket_number AS val FROM failures WHERE ticket_number LIKE ? ORDER BY ticket_number DESC LIMIT 5");
+        $st->execute([$like]);
+        $tickets = array_column($st->fetchAll(), 'val');
+
+        $st = $db->prepare("SELECT DISTINCT fsym.name AS val FROM failures f JOIN failure_symptoms fsym ON fsym.id = f.symptom_id WHERE fsym.name LIKE ? LIMIT 5");
+        $st->execute([$like]);
+        $symptoms = array_column($st->fetchAll(), 'val');
+
+        $st = $db->prepare("SELECT DISTINCT description AS val FROM failures WHERE description LIKE ? AND description IS NOT NULL AND description != '' LIMIT 5");
+        $st->execute([$like]);
+        $descriptions = array_map(function ($d) {
+            return mb_strlen($d) > 60 ? mb_substr($d, 0, 58) . '…' : $d;
+        }, array_column($st->fetchAll(), 'val'));
+
+        $suggestions = array_slice(array_values(array_unique(array_merge($tickets, $symptoms, $descriptions))), 0, 10);
+        $this->jsonOut(['ok' => true, 'suggestions' => $suggestions]);
+    }
 }

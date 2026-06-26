@@ -88,8 +88,31 @@ class AssignmentModel extends BaseModel
      * Pobierz wszystkie zgłoszenia w których dany użytkownik jest w obsadzie.
      * Używane przez "Moje naprawy".
      */
-    public function getByUserId(int $userId): array
+    public function getByUserId(int $userId, array $filters = []): array
     {
+        $where  = ['fa.user_id = ?'];
+        $params = [$userId];
+
+        if (!empty($filters['status_id'])) {
+            $where[]  = 'f.status_id = ?';
+            $params[] = $filters['status_id'];
+        }
+        if (!empty($filters['line_id'])) {
+            $where[]  = 'f.production_line_id = ?';
+            $params[] = $filters['line_id'];
+        }
+        if (isset($filters['category_id'])) {
+            if ($filters['category_id'] === 'none') {
+                $where[] = 'f.category_id IS NULL';
+            } elseif ((int)$filters['category_id'] > 0) {
+                $where[]  = 'f.category_id = ?';
+                $params[] = (int)$filters['category_id'];
+            }
+        }
+        if (!empty($filters['role'])) {
+            $where[] = $filters['role'] === 'leader' ? 'fa.is_first = 1' : 'fa.is_first = 0';
+        }
+
         return $this->fetchAll(
             "SELECT f.*,
                 pl.name AS line_name,
@@ -106,10 +129,10 @@ class AssignmentModel extends BaseModel
              JOIN failure_statuses fs ON fs.id = f.status_id
              LEFT JOIN failure_symptoms fsym ON fsym.id = f.symptom_id
              LEFT JOIN failure_categories fc ON fc.id = f.category_id
-             WHERE fa.user_id = ?
+             WHERE " . implode(' AND ', $where) . "
              ORDER BY f.created_at DESC
              LIMIT 300",
-            [$userId]
+            $params
         );
     }
 

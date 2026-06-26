@@ -104,7 +104,8 @@ class FailureService
         int    $newStatusId,
         int    $currentUserId,
         string $userName,
-        string $note = ''
+        string $note = '',
+        ?string $observationUntil = null
     ): void {
         $id = (int)$failure['id'];
 
@@ -140,12 +141,22 @@ class FailureService
             && !$this->assignmentModel->isInCrew($id, $currentUserId);
         $this->assignmentModel->addMember($id, $currentUserId, $userName, $isFirst);
 
+        $observationUntilSql = null;
+        if (!empty($newStatus['is_observed']) && $observationUntil) {
+            $ts = strtotime($observationUntil);
+            if ($ts === false || $ts <= time()) {
+                throw new \InvalidArgumentException('Wybrana data obserwacji musi być w przyszłości.');
+            }
+            $observationUntilSql = date('Y-m-d H:i:s', $ts);
+        }
+
         // Zmiana statusu w bazie
         $this->repo->changeStatus(
             $id,
             $newStatusId,
             (bool)$newStatus['is_final'],
-            (bool)($newStatus['is_observed'] ?? false)
+            (bool)($newStatus['is_observed'] ?? false),
+            $observationUntilSql
         );
 
         // Zapis historii zmiany
@@ -232,14 +243,17 @@ class FailureService
      */
     public function getObservationWindow(array $failure): array
     {
-        // Pobierz długość okna z ustawień (domyślnie 8h)
-        $windowHours = (int)($this->settingsModel->get('observation_window_hours') ?? 8);
-
         if (empty($failure['status_is_observed']) || empty($failure['observation_started_at'])) {
             return ['active' => false, 'seconds_left' => 0];
         }
 
-        $expiresAt = strtotime($failure['observation_started_at']) + ($windowHours * 3600);
+        if (!empty($failure['observation_until'])) {
+            $expiresAt = strtotime($failure['observation_until']);
+        } else {
+            $windowHours = (int)($this->settingsModel->get('observation_window_hours') ?? 8);
+            $expiresAt   = strtotime($failure['observation_started_at']) + ($windowHours * 3600);
+        }
+
         $remaining = $expiresAt - time();
 
         return [
@@ -280,6 +294,21 @@ class FailureService
     {
         $this->repo->addComment($failureId, $userId, $author, $comment);
         $this->repo->addHistory($failureId, $userId, 'comment_added', null, null, $author, 'Dodano komentarz');
+    }
+
+    public function getCommentById(int $id): ?array
+    {
+        return $this->repo->getCommentById($id);
+    }
+
+    public function updateComment(int $commentId, string $comment): void
+    {
+        $this->repo->updateComment($commentId, $comment);
+    }
+
+    public function deleteComment(int $commentId): void
+    {
+        $this->repo->deleteComment($commentId);
     }
 
     /** @return array<int, array<string, mixed>> */
